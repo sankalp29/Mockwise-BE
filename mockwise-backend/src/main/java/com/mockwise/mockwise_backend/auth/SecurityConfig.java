@@ -4,6 +4,12 @@ import java.util.List;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.authentication.RememberMeServices;
+import org.springframework.security.web.authentication.rememberme.TokenBasedRememberMeServices;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.web.SecurityFilterChain;
@@ -17,18 +23,19 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http, RememberMeServices rememberMeServices) throws Exception {
         System.out.println("Inside filterChain");
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                                .requestMatchers("/", "/login", "/oauth2/**", "/static/**", "/favicon.ico", "/api/auth/signup", "/api/auth/verify").permitAll()
+                                .requestMatchers("/", "/login", "/oauth2/**", "/static/**", "/favicon.ico", "/api/auth/signup", "/api/auth/verify", "/api/auth/login").permitAll()
                                 .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2
                                 .successHandler(authenticationSuccessHandler())
                 )
+                .rememberMe(r -> r.rememberMeServices(rememberMeServices))
                 .logout(logout -> logout.logoutSuccessUrl("http://localhost:5173/home"));
 
         return http.build();
@@ -54,5 +61,23 @@ public class SecurityConfig {
         return (request, response, authentication) -> {
             response.sendRedirect("http://localhost:5173/oauth2/redirect");
         };
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
+        return configuration.getAuthenticationManager();
+    }
+
+    @Bean
+    public RememberMeServices rememberMeServices(AppUserDetailsService userDetailsService) {
+        TokenBasedRememberMeServices services = new TokenBasedRememberMeServices("mockwise-remember-key", userDetailsService);
+        services.setTokenValiditySeconds(30 * 24 * 60 * 60);
+        services.setAlwaysRemember(true);
+        return services;
     }
 }

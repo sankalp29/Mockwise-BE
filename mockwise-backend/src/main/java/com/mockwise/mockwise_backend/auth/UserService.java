@@ -7,9 +7,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class UserService {
+    private static final Logger log = LoggerFactory.getLogger(UserService.class);
     private final UserRepository userRepository;
     private final VerificationTokenRepository tokenRepository;
     private final EmailService emailService;
@@ -43,12 +46,32 @@ public class UserService {
         String token = UUID.randomUUID().toString();
         Instant expiresAt = Instant.now().plus(expiryHours, ChronoUnit.HOURS);
         tokenRepository.save(new VerificationToken(user, token, expiresAt));
+        log.info("Created verification token for email={} exp={}h", emailLower, expiryHours);
         sendVerificationEmail(user.getEmail(), user.getName(), token);
     }
 
     public void sendVerificationEmail(String email, String name, String token) {
         String link = frontendBaseUrl + "/verify-email/confirm?token=" + token;
         emailService.sendVerificationEmail(email, name, link);
+    }
+
+    public enum LoginOutcome { OK, NOT_FOUND, NOT_VERIFIED, INVALID_PASSWORD }
+
+    public LoginOutcome validateLogin(String email, String rawPassword) {
+        String emailLower = email.toLowerCase();
+        var userOpt = userRepository.findByEmailLower(emailLower);
+        if (userOpt.isEmpty()) {
+            log.warn("Login attempt for unknown email={}", emailLower);
+            return LoginOutcome.NOT_FOUND;
+        }
+        var user = userOpt.get();
+        if (!user.isEmailVerified()) {
+            log.warn("Login attempt for unverified email={}", emailLower);
+            return LoginOutcome.NOT_VERIFIED;
+        }
+        boolean matches = passwordEncoder.matches(rawPassword, user.getPasswordHash());
+        log.info("Password match for email={} -> {}", emailLower, matches);
+        return matches ? LoginOutcome.OK : LoginOutcome.INVALID_PASSWORD;
     }
 
     public enum VerifyOutcome { VERIFIED, ALREADY_VERIFIED }
