@@ -85,6 +85,9 @@ public class AuthController {
             @NotBlank String password
     ) {}
 
+    public record PasswordResetRequest(@NotBlank @Email String email) {}
+    public record PasswordResetConfirmRequest(@NotBlank String token, @NotBlank @Size(min=8,max=100) String newPassword) {}
+
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request, jakarta.servlet.http.HttpServletRequest httpRequest, jakarta.servlet.http.HttpServletResponse httpResponse) {
         log.info("Login attempt {}", request.email().toLowerCase());
@@ -114,6 +117,53 @@ public class AuthController {
                 }
             default:
                 return ResponseEntity.status(500).build();
+        }
+    }
+
+    @PostMapping("/password/reset-request")
+    public ResponseEntity<?> passwordResetRequest(@Valid @RequestBody PasswordResetRequest request) {
+        try {
+            userService.requestPasswordReset(request.email());
+            return ResponseEntity.ok(Map.of("message", "Password reset email sent"));
+        } catch (UserService.UnknownEmailException e) {
+            return ResponseEntity.status(402).body(Map.of("message", "Email not registered"));
+        }
+    }
+
+    @PostMapping("/password/reset")
+    public ResponseEntity<?> passwordReset(@Valid @RequestBody PasswordResetConfirmRequest request) {
+        try {
+            userService.resetPassword(request.token(), request.newPassword());
+            return ResponseEntity.ok(Map.of("message", "Password has been reset"));
+        } catch (UserService.TokenInvalidException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", "Invalid token"));
+        } catch (UserService.TokenExpiredException e) {
+            return ResponseEntity.status(HttpStatus.GONE).body(Map.of("message", "Reset link expired"));
+        }
+    }
+
+    @GetMapping("/password/reset/validate")
+    public ResponseEntity<?> validateResetToken(@RequestParam("token") String token) {
+        var status = userService.checkPasswordResetToken(token);
+        return switch (status) {
+            case VALID -> ResponseEntity.ok(Map.of("status", "valid"));
+            case USED -> ResponseEntity.status(HttpStatus.GONE).body(Map.of("status", "used"));
+            case EXPIRED -> ResponseEntity.status(HttpStatus.GONE).body(Map.of("status", "expired"));
+            case INVALID -> ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("status", "invalid"));
+        };
+    }
+
+    @PostMapping("/verify/resend")
+    public ResponseEntity<?> resendVerification(@RequestBody Map<String, String> body) {
+        String token = body.get("token");
+        if (token == null || token.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Missing token"));
+        }
+        try {
+            userService.resendVerificationUsingExpiredToken(token);
+            return ResponseEntity.ok(Map.of("message", "A new verification email has been sent"));
+        } catch (UserService.TokenInvalidException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", "Invalid verification token"));
         }
     }
 

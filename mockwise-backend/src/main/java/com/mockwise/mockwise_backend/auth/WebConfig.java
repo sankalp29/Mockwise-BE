@@ -13,7 +13,6 @@ public class WebConfig {
         return new WebMvcConfigurer() {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
-                System.out.println("Inside addCorsMapping");
                 registry.addMapping("/**")
                     .allowedOrigins("http://localhost:5173")
                     .allowedMethods("GET", "POST", "PUT", "DELETE")

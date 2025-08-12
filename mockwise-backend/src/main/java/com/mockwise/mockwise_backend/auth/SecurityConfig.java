@@ -24,12 +24,24 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, RememberMeServices rememberMeServices) throws Exception {
-        System.out.println("Inside filterChain");
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
+                .exceptionHandling(e -> e.authenticationEntryPoint((req, res, ex) -> {
+                    String uri = req.getRequestURI();
+                    String accept = req.getHeader("Accept");
+                    String requestedWith = req.getHeader("X-Requested-With");
+                    boolean isApi = uri != null && uri.startsWith("/api/");
+                    boolean isAjax = "XMLHttpRequest".equalsIgnoreCase(requestedWith);
+                    boolean wantsJson = accept != null && accept.contains("application/json");
+                    if (isApi || isAjax || wantsJson) {
+                        res.sendError(401);
+                    } else {
+                        res.sendRedirect("http://localhost:5173/login");
+                    }
+                }))
                 .authorizeHttpRequests(auth -> auth
-                                .requestMatchers("/", "/login", "/oauth2/**", "/static/**", "/favicon.ico", "/api/auth/signup", "/api/auth/verify", "/api/auth/login").permitAll()
+                                .requestMatchers("/", "/login", "/oauth2/**", "/static/**", "/favicon.ico", "/api/auth/signup", "/api/auth/verify", "/api/auth/login", "/api/auth/password/**").permitAll()
                                 .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2
@@ -43,7 +55,6 @@ public class SecurityConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-        System.out.println("Inside corsConfigurationSource");
         var config = new CorsConfiguration();
         config.setAllowedOrigins(List.of("http://localhost:5173"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
@@ -57,7 +68,6 @@ public class SecurityConfig {
 
     @Bean
     public AuthenticationSuccessHandler authenticationSuccessHandler() {
-        System.out.println("Inside authenticationSuccessHandler");
         return (request, response, authentication) -> {
             response.sendRedirect("http://localhost:5173/oauth2/redirect");
         };
