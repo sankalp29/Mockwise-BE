@@ -37,15 +37,16 @@ public class SecurityConfig {
                     if (isApi || isAjax || wantsJson) {
                         res.sendError(401);
                     } else {
-                        res.sendRedirect("http://localhost:5173/login");
+                        res.sendRedirect("http://localhost:5173/home");
                     }
                 }))
                 .authorizeHttpRequests(auth -> auth
-                                .requestMatchers("/", "/login", "/oauth2/**", "/static/**", "/favicon.ico", "/api/auth/signup", "/api/auth/verify", "/api/auth/login", "/api/auth/password/**").permitAll()
+                                .requestMatchers("/", "/login", "/login/oauth2/**", "/oauth2/**", "/static/**", "/favicon.ico", "/api/auth/signup", "/api/auth/verify", "/api/auth/login", "/api/auth/password/**").permitAll()
                                 .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2
                                 .successHandler(authenticationSuccessHandler())
+                                .failureHandler((req, res, ex) -> res.sendRedirect("http://localhost:5173/home?oauth_error=1"))
                 )
                 .rememberMe(r -> r.rememberMeServices(rememberMeServices))
                 .logout(logout -> logout.logoutSuccessUrl("http://localhost:5173/home"));
@@ -69,7 +70,7 @@ public class SecurityConfig {
     @Bean
     public AuthenticationSuccessHandler authenticationSuccessHandler() {
         return (request, response, authentication) -> {
-            response.sendRedirect("http://localhost:5173/oauth2/redirect");
+            response.sendRedirect("http://localhost:5173/home");
         };
     }
 
