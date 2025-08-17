@@ -46,6 +46,9 @@ public class Interview {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Status status = Status.IN_PROGRESS;
+
+    @Column(name = "aggregated")
+    private Boolean aggregated = false;
     
     @OneToMany(mappedBy = "interview", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<UserSubmission> submissions;

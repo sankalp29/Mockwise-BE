@@ -21,6 +21,7 @@ public class InterviewService {
     private final QuestionRepository questionRepository;
     private final UserSubmissionRepository userSubmissionRepository;
     private final ClaudeService claudeService;
+    private final DashboardAggregateRepository dashboardAggregateRepository;
 
     @Transactional
     public Interview startInterview(SupabaseAuthService.SupabaseUser user, Question.Difficulty difficulty, Integer numQuestions, Integer timeMinutes) {
@@ -75,20 +76,90 @@ public class InterviewService {
     public Mono<Void> generateFeedbackForInterview(UUID interviewId) {
         log.info("Generating Claude feedback for interview: {}", interviewId);
 
-        List<UserSubmission> submissions = userSubmissionRepository.findByInterview_Id(interviewId);
+        List<UserSubmission> submissions = userSubmissionRepository.findByInterviewId(interviewId);
         log.info("Found {} submissions for interview: {}", submissions.size(), interviewId);
         return Flux.fromIterable(submissions)
                 .flatMap(this::generateFeedbackForSubmission)
-                .then()
+                .then(Mono.fromRunnable(() -> {
+                    log.info("*****POST-FEEDBACK HOOKS STARTING for interview: {}******", interviewId);
+                    try {
+                        Interview iv = interviewRepository.findById(interviewId).orElse(null);
+                        if (iv != null) {
+                            log.info("Found interview for post-processing: {}, aggregated: {}", iv.getId(), iv.getAggregated());
+                            if (Boolean.FALSE.equals(iv.getAggregated())) {
+                                log.info("Updating dashboard aggregate for interview: {}", iv.getId());
+                                updateDashboardAggregate(iv);
+                                iv.setAggregated(true);
+                                interviewRepository.save(iv);
+                            }
+                            log.info("Calling computeAIInsights for user: {}", iv.getUserId());
+                            computeAIInsights(iv.getUserId());
+                        } else {
+                            log.warn("Interview not found for post-processing: {}", interviewId);
+                        }
+                    } catch (Exception e) {
+                        log.error("Post-feedback hooks failed: {}", e.getMessage(), e);
+                    }
+                }))
                 .doOnSuccess(v -> log.info("Successfully generated feedback for all submissions in interview: {}", interviewId))
-                .doOnError(e -> log.error("Error generating feedback for interview: {}", interviewId, e));
+                .doOnError(e -> log.error("Error generating feedback for interview: {}", interviewId, e))
+                .then();
+    }
+
+    private void updateDashboardAggregate(Interview interview) {
+        String userId = interview.getUserId();
+        DashboardAggregate agg = dashboardAggregateRepository.findByUserId(userId).orElseGet(() -> {
+            DashboardAggregate a = new DashboardAggregate();
+            a.setUserId(userId);
+            a.setLowestScore(10.0);
+            return a;
+        });
+
+        long seconds = 0L;
+        if (interview.getEndedAt() != null && interview.getStartedAt() != null) {
+            seconds = Math.max(0, interview.getEndedAt().getEpochSecond() - interview.getStartedAt().getEpochSecond());
+        }
+
+        List<UserSubmission> subs = userSubmissionRepository.findByInterviewId(interview.getId());
+        double[] ratings = subs.stream()
+                .map(UserSubmission::getClaudeFeedback)
+                .filter(f -> f != null && !f.isBlank())
+                .map(this::extractOverallRating)
+                .filter(r -> r != null && r >= 0)
+                .mapToDouble(Double::doubleValue)
+                .toArray();
+        double overall = ratings.length == 0 ? 0.0 : java.util.Arrays.stream(ratings).average().orElse(0.0);
+
+        agg.setTotalMocks(agg.getTotalMocks() + 1);
+        agg.setTotalTimeSpentSeconds(agg.getTotalTimeSpentSeconds() + seconds);
+        agg.setSumOverallRating(agg.getSumOverallRating() + overall);
+        agg.setRatingCount(agg.getRatingCount() + 1);
+        agg.setHighestScore(Math.max(agg.getHighestScore(), overall));
+        agg.setLowestScore(Math.min(agg.getLowestScore(), overall));
+        agg.setTotalQuestions(agg.getTotalQuestions() + interview.getNumQuestions());
+        if (agg.getLastMockDate() == null || interview.getStartedAt().isAfter(agg.getLastMockDate())) {
+            agg.setLastMockDate(interview.getStartedAt());
+        }
+
+        switch (interview.getDifficulty()) {
+            case EASY -> { agg.setSumEasy(agg.getSumEasy() + overall); agg.setCntEasy(agg.getCntEasy() + 1); }
+            case MEDIUM -> { agg.setSumMedium(agg.getSumMedium() + overall); agg.setCntMedium(agg.getCntMedium() + 1); }
+            case HARD -> { agg.setSumHard(agg.getSumHard() + overall); agg.setCntHard(agg.getCntHard() + 1); }
+        }
+
+        agg.setUpdatedAt(Instant.now());
+        dashboardAggregateRepository.save(agg);
     }
 
     private Mono<UserSubmission> generateFeedbackForSubmission(UserSubmission submission) {
+        log.info("*****GENERATING FEEDBACK FOR SUBMISSION: {}******", submission.getId());
         Question question = submission.getQuestion();
         String problemStatement = formatProblemStatement(question);
-
-        return claudeService.evaluateCode(problemStatement, submission.getCode(), submission.getLanguage())
+        
+        // Generate prompt for code feedback and call Claude
+        String prompt = claudeService.buildCodeFeedbackPrompt(problemStatement, submission.getCode(), submission.getLanguage());
+        log.info("Calling Claude API for submission: {}", submission.getId());
+        return claudeService.callClaude(prompt)
                 .map(feedback -> {
                     log.info("Feedback for submission: {}", feedback);
                     submission.setClaudeFeedback(feedback);
@@ -133,6 +204,69 @@ public class InterviewService {
         }
         
         return questions;
+    }
+
+    // Dashboard helpers
+    public List<Interview> getInterviewsForUser(String userId) {
+        return interviewRepository.findByUserIdAndStatusOrderByStartedAtDesc(userId, Interview.Status.COMPLETED);
+    }
+
+    public List<UserSubmission> getSubmissionsForUser(String userId) {
+        // naive approach: fetch interviews then submissions per interview
+        List<Interview> interviews = getInterviewsForUser(userId);
+        java.util.List<UserSubmission> all = new java.util.ArrayList<>();
+        for (Interview i : interviews) {
+            all.addAll(userSubmissionRepository.findByInterviewId(i.getId()));
+        }
+        return all;
+    }
+
+    public Double extractOverallRating(String feedbackJson) {
+        try {
+            var node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(feedbackJson);
+            if (node.has("overallRating")) return node.get("overallRating").asDouble();
+        } catch (Exception ignore) {}
+        return null;
+    }
+
+    public String getInsightsJson(String userId) {
+        return dashboardAggregateRepository.findByUserId(userId)
+                .map(DashboardAggregate::getInsightsJson)
+                .orElse(null);
+    }
+
+    // AI Insights: compute if a new interview exists since last cache
+    public void computeAIInsights(String userId) {
+        log.info("*****STARTING AI INSIGHTS GENERATION for user: {}******", userId);
+        DashboardAggregate agg = dashboardAggregateRepository.findByUserId(userId).orElse(null);
+        if (agg == null) {
+            log.warn("No DashboardAggregate found for user: {}", userId);
+            return;
+        }
+        int interviewCount = agg.getTotalMocks();
+
+        var recent = interviewRepository.findByUserIdOrderByStartedAtDesc(userId);
+        recent = recent.subList(0, Math.min(5, recent.size()));
+        var subs = new java.util.ArrayList<UserSubmission>();
+        for (Interview i : recent) {
+            subs.addAll(userSubmissionRepository.findByInterviewId(i.getId()));
+        }
+
+        StringBuilder ctx = new StringBuilder();
+        for (UserSubmission s : subs) {
+            if (s.getClaudeFeedback() != null) {
+                ctx.append("\nSubmission Feedback:\n").append(s.getClaudeFeedback()).append("\n");
+            }
+        }
+        log.info("**** Previous Feedbacks Context:**** {}", ctx.toString());
+        // Generate prompt for AI insights and call Claude
+        String prompt = claudeService.buildAIInsightsPrompt(ctx.toString());
+        String insightsJson = claudeService.callClaude(prompt).blockOptional().orElse("{}");
+        log.info("AI Insights JSON: {}", insightsJson);
+        agg.setInsightsJson(insightsJson);
+        agg.setInsightsInterviewCount(interviewCount);
+        agg.setUpdatedAt(Instant.now());
+        dashboardAggregateRepository.save(agg);
     }
 
     public Interview getInterviewWithFeedback(UUID interviewId) {

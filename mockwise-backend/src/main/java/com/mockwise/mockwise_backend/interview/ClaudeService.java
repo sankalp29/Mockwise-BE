@@ -49,19 +49,17 @@ public class ClaudeService {
         }
     }
 
-    public Mono<String> evaluateCode(String problemStatement, String userCode, String language) {
-        log.info("ClaudeService.evaluateCode called");
+    // Single unified Claude API call method
+    public Mono<String> callClaude(String prompt) {
+        log.info("ClaudeService.callClaude called");
         
         if (anthropicClient == null) {
             log.warn("Anthropic client is null, returning fallback");
             return Mono.just(createFallbackResponse("Anthropic client not initialized"));
         }
         
-        // Build request
-        String prompt = buildPrompt(problemStatement, userCode, language);
         return Mono.fromCallable(() -> {
             try {
-                // Use beta Messages API per available SDK classes
                 var messages = anthropicClient.beta().messages();
                 MessageCreateParams params = MessageCreateParams.builder()
                         .model("claude-sonnet-4-20250514")
@@ -79,7 +77,8 @@ public class ClaudeService {
         });
     }
 
-    private String buildPrompt(String problemStatement, String userCode, String language) {
+    // Helper: Generate prompt for code feedback evaluation
+    public String buildCodeFeedbackPrompt(String problemStatement, String userCode, String language) {
         return String.format("""
             Evaluate the following coding problem and solution for correctness, time complexity, space complexity, clarity, readability, modularity, and provide an overall feedback and rating out of 10.
             
@@ -107,6 +106,11 @@ public class ClaudeService {
             """, problemStatement, language, language, userCode);
     }
 
+    // Helper: Generate prompt for AI insights from feedback data
+    public String buildAIInsightsPrompt(String feedbackContext) {
+        return "Given the following recent interview feedback JSON blobs, extract: strongestTopic, weakestTopic, mostCommonMistake as a JSON object with keys {\\\"strongestTopic\\\", \\\"weakestTopic\\\", \\\"mostCommonMistake\\\"}. Return ONLY the JSON.\n" + feedbackContext;
+    }
+
     private String extractContentFromResponse(String response) {
         try {
             JsonNode root = objectMapper.readTree(response);
@@ -116,7 +120,13 @@ public class ClaudeService {
                 JsonNode first = content.get(0);
                 JsonNode textNode = first.get("text");
                 if (textNode != null && !textNode.isNull()) {
-                    return textNode.asText();
+                    String text = textNode.asText();
+                    String normalized = coerceToJson(text);
+                    if (normalized != null) {
+                        return normalized;
+                    }
+                    log.warn("Claude text did not contain valid JSON; returning fallback. Text: {}", text);
+                    return createFallbackResponse("Claude returned non-JSON response");
                 }
             }
             log.warn("Unexpected Anthropic SDK response: {}", response);
@@ -125,6 +135,38 @@ public class ClaudeService {
             log.error("Error parsing Claude response: ", e);
             return createFallbackResponse("Error parsing Claude response: " + e.getMessage());
         }
+    }
+
+    // Attempts to extract and normalize a JSON object from arbitrary text
+    private String coerceToJson(String text) {
+        if (text == null) return null;
+        // Try direct parse
+        try {
+            JsonNode n = objectMapper.readTree(text);
+            return objectMapper.writeValueAsString(n);
+        } catch (Exception ignore) {
+        }
+        // Extract first balanced JSON object
+        int start = text.indexOf('{');
+        if (start < 0) return null;
+        int depth = 0;
+        for (int i = start; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '{') depth++;
+            else if (c == '}') {
+                depth--;
+                if (depth == 0) {
+                    String candidate = text.substring(start, i + 1);
+                    try {
+                        JsonNode n = objectMapper.readTree(candidate);
+                        return objectMapper.writeValueAsString(n);
+                    } catch (Exception ignore) {
+                        return null;
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     private String createFallbackResponse(String errorMessage) {
