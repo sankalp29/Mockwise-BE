@@ -248,4 +248,32 @@ public class InterviewController {
         public List<InterviewService.SubmissionRequest> getSubmissions() { return submissions; }
         public void setSubmissions(List<InterviewService.SubmissionRequest> submissions) { this.submissions = submissions; }
     }
+
+    @PostMapping("/check-syntax")
+    public ResponseEntity<?> checkSyntax(
+            @RequestBody CheckSyntaxRequest request,
+            Authentication authentication) {
+        log.info("Checking syntax for language: {}", request.getLanguage());
+        try {
+            SupabaseAuthService.SupabaseUser user = extractSupabaseUser(authentication);
+            List<String> errors = interviewService.checkSyntax(request.getCode(), request.getLanguage());
+            return ResponseEntity.ok(Map.of("errors", errors));
+        } catch (Exception e) {
+            log.error("Error checking syntax", e);
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    public static class CheckSyntaxRequest {
+        private String code;
+        private String language;
+
+        public CheckSyntaxRequest() {}
+
+        public String getCode() { return code; }
+        public void setCode(String code) { this.code = code; }
+
+        public String getLanguage() { return language; }
+        public void setLanguage(String language) { this.language = language; }
+    }
 }

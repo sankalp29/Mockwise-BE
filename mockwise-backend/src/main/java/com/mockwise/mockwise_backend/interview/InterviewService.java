@@ -8,9 +8,23 @@ import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.StringWriter;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
+import javax.tools.Diagnostic;
+import javax.tools.DiagnosticCollector;
+import javax.tools.JavaCompiler;
+import javax.tools.JavaFileObject;
+import javax.tools.StandardJavaFileManager;
+import javax.tools.ToolProvider;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 @Service
 @RequiredArgsConstructor
@@ -315,5 +329,159 @@ public class InterviewService {
 
         public String getLanguage() { return language; }
         public void setLanguage(String language) { this.language = language; }
+    }
+
+    // Placeholder for syntax checking
+    public List<String> checkSyntax(String code, String language) {
+        log.info("Performing syntax check for language: {}", language);
+        List<String> errors = new ArrayList<>();
+        File tempDir = null;
+
+        try {
+            tempDir = Files.createTempDirectory("syntax_check_test").toFile();
+
+            switch (language.toLowerCase()) {
+                case "java":
+                    return checkJavaSyntax(code, tempDir);
+                case "python":
+                    return checkPythonSyntax(code, tempDir);
+                case "cpp":
+                    return checkCppSyntax(code, tempDir);
+                default:
+                    errors.add("Unsupported language for syntax checking: " + language);
+                    return errors;
+            }
+        } catch (Exception e) {
+            log.error("Exception during syntax check for language {}", language, e);
+            errors.add("Internal server error during syntax check: " + e.getMessage());
+            return errors;
+        } finally {
+            if (tempDir != null) {
+                try {
+                    Files.walk(tempDir.toPath())
+                         .sorted(java.util.Comparator.reverseOrder())
+                         .map(Path::toFile)
+                         .forEach(File::delete);
+                } catch (Exception e) {
+                    log.warn("Failed to clean up temporary directory: {}", tempDir.getAbsolutePath(), e);
+                }
+            }
+        }
+    }
+
+    private List<String> checkJavaSyntax(String code, File tempDir) throws Exception {
+        List<String> errors = new ArrayList<>();
+        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+        if (compiler == null) {
+            errors.add("JDK not found. Please ensure a JDK is installed and JAVA_HOME is set correctly.");
+            return errors;
+        }
+
+        DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
+        File sourceFile = new File(tempDir, "Solution.java");
+
+        // Wrap the provided code in a class if it's not already
+        String fullCode = code;
+        if (!code.contains("class Solution")) {
+            fullCode = "public class Solution {\n" + code + "\n}";
+        }
+
+        // Write the provided code to a temporary Java file
+        try (FileWriter writer = new FileWriter(sourceFile)) {
+            writer.write(fullCode);
+        }
+
+        // Set up file manager and compilation task
+        StandardJavaFileManager fileManager = compiler.getStandardFileManager(diagnostics, Locale.getDefault(), null);
+        Iterable<? extends JavaFileObject> compilationUnits = fileManager.getJavaFileObjectsFromFiles(Arrays.asList(sourceFile));
+        StringWriter output = new StringWriter();
+
+        JavaCompiler.CompilationTask task = compiler.getTask(
+            output, 
+            fileManager, 
+            diagnostics, 
+            Arrays.asList("-d", tempDir.getAbsolutePath()), // Output class files to temp directory
+            null, 
+            compilationUnits);
+
+        // Perform compilation
+        boolean success = task.call();
+
+        if (!success) {
+            for (Diagnostic<? extends JavaFileObject> diagnostic : diagnostics.getDiagnostics()) {
+                String message = diagnostic.getMessage(Locale.getDefault());
+                // Remove the temporary file path from the message
+                message = message.replace(diagnostic.getSource().getName(), "Solution.java");
+                errors.add(String.format("Error on line %d: %s",
+                                        diagnostic.getLineNumber(),
+                                        message));
+            }
+        } else {
+            // Optionally, if compilation is successful but there are warnings, you can add them
+            for (Diagnostic<? extends JavaFileObject> diagnostic : diagnostics.getDiagnostics()) {
+                if (diagnostic.getKind() == Diagnostic.Kind.WARNING) {
+                    String message = diagnostic.getMessage(Locale.getDefault());
+                    // Remove the temporary file path from the message
+                    message = message.replace(diagnostic.getSource().getName(), "Solution.java");
+                    errors.add(String.format("Warning on line %d: %s",
+                                            diagnostic.getLineNumber(),
+                                            message));
+                }
+            }
+        }
+        fileManager.close();
+        return errors;
+    }
+
+    private List<String> executeCommand(List<String> command, File workingDir, String fileName) throws Exception {
+        ProcessBuilder processBuilder = new ProcessBuilder(command);
+        processBuilder.directory(workingDir);
+        processBuilder.redirectErrorStream(true); // Redirect error stream to output stream
+
+        Process process = processBuilder.start();
+        // Read output from the process
+        List<String> outputLines = new ArrayList<>();
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(process.getInputStream()))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                outputLines.add(line.replace(workingDir.getAbsolutePath() + File.separator, "")); // Clean up path
+            }
+        }
+
+        int exitCode = process.waitFor();
+        if (exitCode != 0 && outputLines.isEmpty()) {
+            // If there's an error but no output, provide a generic message
+            outputLines.add("Command execution failed with exit code " + exitCode + ". No specific error message provided by tool.");
+        }
+        return outputLines;
+    }
+
+    private List<String> checkPythonSyntax(String code, File tempDir) throws Exception {
+        File sourceFile = new File(tempDir, "solution.py");
+        try (FileWriter writer = new FileWriter(sourceFile)) {
+            writer.write(code);
+        }
+        // Use python -m py_compile to check syntax
+        List<String> command = Arrays.asList("python", "-m", "py_compile", sourceFile.getName());
+        List<String> output = executeCommand(command, tempDir, sourceFile.getName());
+        if (output.isEmpty()) {
+            return List.of(); // No errors
+        } else {
+            // Filter out non-error output like "Syntax producing bytecode: ..."
+            return output.stream()
+                         .filter(line -> line.contains("Error") || line.contains("SyntaxError"))
+                         .collect(java.util.ArrayList::new, java.util.ArrayList::add, java.util.ArrayList::addAll);
+        }
+    }
+
+    private List<String> checkCppSyntax(String code, File tempDir) throws Exception {
+        File sourceFile = new File(tempDir, "solution.cpp");
+        try (FileWriter writer = new FileWriter(sourceFile)) {
+            writer.write(code);
+        }
+        // Use g++ -fsyntax-only to check syntax
+        List<String> command = Arrays.asList("g++", "-fsyntax-only", sourceFile.getName());
+        List<String> output = executeCommand(command, tempDir, sourceFile.getName());
+        return output; // g++ only outputs errors to stderr, which is redirected to output
     }
 }
