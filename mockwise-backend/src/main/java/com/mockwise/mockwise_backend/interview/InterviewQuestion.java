@@ -5,34 +5,37 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import java.util.UUID;
+import org.hibernate.annotations.UuidGenerator;
 
 @Entity
-@Table(name = "interview_question")
+@Table(name = "interview_questions")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class InterviewQuestion {
     
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue
+    @UuidGenerator
     private UUID id;
     
-    @Column(name = "interview_id", nullable = false)
-    private UUID interviewId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "interview_id", nullable = false)
+    private Interview interview;
     
-    @Column(name = "question_id", nullable = false)
-    private UUID questionId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "question_id", nullable = false)
+    private Question question;
     
     @Column(name = "question_order")
     private Integer questionOrder;
     
     @Column(name = "assigned_at")
     private java.time.Instant assignedAt = java.time.Instant.now();
-    
-    // Constructor for convenience
-    public InterviewQuestion(UUID interviewId, UUID questionId, Integer questionOrder) {
-        this.interviewId = interviewId;
-        this.questionId = questionId;
+     
+    public InterviewQuestion(Interview interview, Question question, Integer questionOrder) {
+        this.interview = interview;
+        this.question = question;
         this.questionOrder = questionOrder;
         this.assignedAt = java.time.Instant.now();
     }

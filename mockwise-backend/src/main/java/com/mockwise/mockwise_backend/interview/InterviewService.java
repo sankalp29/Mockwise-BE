@@ -54,9 +54,19 @@ public class InterviewService {
         interview.setTimeMinutes(timeMinutes);
         interview.setStartedAt(Instant.now());
         interview.setStatus(Interview.Status.IN_PROGRESS);
-        interview.setAssignedQuestions(assignedQuestions);
 
-        return interviewRepository.save(interview);
+        // Build link entities preserving order
+        List<InterviewQuestion> links = new ArrayList<>();
+        int order = 1;
+        for (Question q : assignedQuestions) {
+            links.add(new InterviewQuestion(interview, q, order++));
+        }
+        interview.setAssignedQuestionLinks(links);
+
+        Interview saved = interviewRepository.saveAndFlush(interview);
+        // Force initialization of assigned questions for response
+        saved.getAssignedQuestions().size();
+        return saved;
     }
 
     @Transactional

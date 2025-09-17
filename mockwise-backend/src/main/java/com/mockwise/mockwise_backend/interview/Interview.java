@@ -1,6 +1,7 @@
 package com.mockwise.mockwise_backend.interview;
 
 import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
@@ -53,13 +54,17 @@ public class Interview {
     @OneToMany(mappedBy = "interview", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<UserSubmission> submissions;
     
-    @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-        name = "interview_questions",
-        joinColumns = @JoinColumn(name = "interview_id"),
-        inverseJoinColumns = @JoinColumn(name = "question_id")
-    )
-    private List<Question> assignedQuestions;
+    @OneToMany(mappedBy = "interview", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<InterviewQuestion> assignedQuestionLinks;
+
+    @Transient
+    public List<Question> getAssignedQuestions() {
+        if (assignedQuestionLinks == null) {
+            return java.util.List.of();
+        }
+        return assignedQuestionLinks.stream().map(InterviewQuestion::getQuestion).toList();
+    }
     
     public enum Status {
         IN_PROGRESS, COMPLETED, ABANDONED

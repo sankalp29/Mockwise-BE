@@ -9,7 +9,7 @@ import java.util.UUID;
 @Repository
 public interface InterviewQuestionRepository extends JpaRepository<InterviewQuestion, UUID> {
     
-    List<InterviewQuestion> findByInterviewIdOrderByQuestionOrder(UUID interviewId);
+    List<InterviewQuestion> findByInterview_IdOrderByQuestionOrder(UUID interviewId);
     
-    List<InterviewQuestion> findByQuestionId(UUID questionId);
+    List<InterviewQuestion> findByQuestion_Id(UUID questionId);
 }
