@@ -1,0 +1,29 @@
+package com.mockwise.mockwise_backend.interview;
+
+import jakarta.persistence.*;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+import java.util.UUID;
+
+@Entity
+@Table(name = "code_stub_templates")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class CodeStubTemplate {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private UUID id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "question_id", nullable = false)
+    private Question question;
+
+    @Column(name = "language", nullable = false)
+    private String language;
+
+    @Column(name = "stub_content", columnDefinition = "TEXT", nullable = false)
+    private String stubContent;
+}

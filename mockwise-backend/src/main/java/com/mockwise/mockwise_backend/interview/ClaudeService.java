@@ -78,7 +78,7 @@ public class ClaudeService {
     }
 
     // Helper: Generate prompt for code feedback evaluation
-    public String buildCodeFeedbackPrompt(String problemStatement, String userCode, String language) {
+    public String buildCodeFeedbackPrompt(String problemStatement, String userCode, String language, String executionResultsSummary) {
         return String.format("""
             Evaluate the following coding problem and solution for correctness, time complexity, space complexity, clarity, readability, modularity, and provide an overall feedback and rating out of 10.
             
@@ -89,6 +89,9 @@ public class ClaudeService {
             ```%s
             %s
             ```
+            
+            **Code Execution Results:**
+            %s
             
             Please provide your evaluation in the following JSON format ONLY. Do not include any other text or explanation outside of this JSON:
             
@@ -103,7 +106,7 @@ public class ClaudeService {
                 "strengths": ["strength1", "strength2"],
                 "improvements": ["improvement1", "improvement2"]
             }
-            """, problemStatement, language, language, userCode);
+            """, problemStatement, language, language, userCode, executionResultsSummary);
     }
 
     // Helper: Generate prompt for AI insights from feedback data

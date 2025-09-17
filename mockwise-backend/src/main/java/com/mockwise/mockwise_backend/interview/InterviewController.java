@@ -11,6 +11,7 @@ import reactor.core.publisher.Mono;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/interview")
@@ -56,17 +57,30 @@ public class InterviewController {
             );
             
             // Get the assigned questions from the interview
-            List<Question> questions = interview.getAssignedQuestions();
+            List<Question> questions = interview.getInterviewQuestions().stream()
+                                                .map(InterviewQuestion::getQuestion)
+                                                .collect(Collectors.toList());
             
             log.info("Interview created with {} assigned questions for difficulty: {}", 
                      questions.size(), request.getDifficulty());
+            log.info("Questions being returned: {}", questions.stream()
+                     .map(Question::getTitle)
+                     .collect(Collectors.toList()));
+            log.info("Interview object: id={}, status={}, userEmail={}", 
+                     interview.getId(), interview.getStatus(), interview.getUserEmail());
             
-            return ResponseEntity.ok(Map.of(
+            Map<String, Object> response = Map.of(
                 "interview", interview,
                 "questions", questions
-            ));
+            );
+            log.info("Response keys: {}", response.keySet());
+            
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             log.error("Error starting interview", e);
+            if (e.getMessage() != null && e.getMessage().contains("JSON")) {
+                log.error("JSON serialization error detected - this might be a lazy loading issue");
+            }
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
@@ -81,30 +95,30 @@ public class InterviewController {
         log.info("Authentication present: {}", authentication != null);
         log.info("Authentication type: {}", authentication != null ? authentication.getClass().getSimpleName() : "null");
         
-        try {
-            // End the interview and save submissions
-            Interview interview = interviewService.endInterview(interviewId, request.getSubmissions());
-            log.info("Interview ended successfully: {}", interview.getId());
-            log.info("Interview ended: {}", interview);
+        // End the interview and save submissions
+        // The interviewService.endInterview now returns a Mono<Interview>
+        return interviewService.endInterview(interviewId, request.getSubmissions())
+                .flatMap((Interview interview) -> {
+                    log.info("Interview ended successfully: {}", interview.getId());
+                    log.info("Interview ended: {}", interview);
 
+                    // Generate feedback asynchronously (fire-and-forget)
+                    log.info("*****STARTING FEEDBACK GENERATION******");
+                    interviewService.generateFeedbackForInterview(interviewId)
+                            .doOnError(e -> log.error("Async feedback generation failed for interview: {}", interviewId, e))
+                            .subscribe(); // Fire-and-forget
 
-            // Generate feedback asynchronously (fire-and-forget)
-            log.info("*****STARTING FEEDBACK GENERATION******");
-            interviewService.generateFeedbackForInterview(interviewId)
-                    .doOnError(e -> log.error("Async feedback generation failed for interview: {}", interviewId, e))
-                    .subscribe(); // Fire-and-forget
-
-            // Return immediate success response
-            Map<String, Object> response = Map.of(
-                "message", "Interview submitted successfully",
-                "interviewId", interview.getId().toString()
-            );
-            return Mono.just(ResponseEntity.ok(response));
-                    
-        } catch (Exception e) {
-            log.error("Error submitting interview", e);
-            return Mono.just(ResponseEntity.badRequest().body(Map.of("error", (Object) e.getMessage())));
-        }
+                    // Return immediate success response
+                    Map<String, Object> response = Map.of(
+                        "message", "Interview submitted successfully",
+                        "interviewId", interview.getId().toString()
+                    );
+                    return Mono.just(ResponseEntity.ok(response));
+                })
+                .onErrorResume(e -> {
+                    log.error("Error submitting interview", e);
+                    return Mono.just(ResponseEntity.badRequest().body(Map.of("error", (Object) e.getMessage())));
+                });
     }
 
     @GetMapping("/{interviewId}/feedback")
@@ -137,6 +151,23 @@ public class InterviewController {
         return ResponseEntity.ok(questions);
     }
 
+    @GetMapping("/questions/{questionId}/stub")
+    public ResponseEntity<String> getQuestionCodeStub(
+            @PathVariable UUID questionId,
+            @RequestParam String language) {
+        log.info("Fetching code stub for question {} in language {}", questionId, language);
+        try {
+            String codeStub = interviewService.getCodeStub(questionId, language);
+            return ResponseEntity.ok(codeStub);
+        } catch (IllegalArgumentException e) {
+            log.warn("Code stub request failed: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            log.error("Error fetching code stub for question {} in language {}", questionId, language, e);
+            return ResponseEntity.internalServerError().body("Internal server error");
+        }
+    }
+
     @GetMapping("/{interviewId}/validate")
     public ResponseEntity<?> validateInterviewSession(
             @PathVariable UUID interviewId,
@@ -167,7 +198,9 @@ public class InterviewController {
             
             return ResponseEntity.ok(Map.of(
                 "interview", interview,
-                "questions", interview.getAssignedQuestions(),
+                "questions", interview.getInterviewQuestions().stream()
+                                        .map(InterviewQuestion::getQuestion)
+                                        .collect(Collectors.toList()),
                 "remainingTimeMs", remainingMs,
                 "valid", true
             ));
@@ -205,6 +238,39 @@ public class InterviewController {
         } catch (Exception e) {
             log.error("Authentication failed: ", e);
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/{interviewId}/generate-feedback")
+    public Mono<ResponseEntity<Map<String, Object>>> generateFeedback(
+            @PathVariable UUID interviewId,
+            Authentication authentication) {
+
+        log.info("Generating feedback for interview: {}", interviewId);
+        log.info("Authentication present: {}", authentication != null);
+
+        try {
+            // Extract user and validate access if needed (similar to other endpoints)
+            SupabaseAuthService.SupabaseUser user = extractSupabaseUser(authentication);
+            log.info("User {} is requesting feedback generation for interview {}", user.getEmail(), interviewId);
+
+            interviewService.generateFeedbackForInterview(interviewId)
+                    .doOnError(e -> log.error("Async feedback generation failed for interview: {}", interviewId, e))
+                    .subscribe(); // Fire-and-forget, as per submitInterview
+
+            return Mono.just(ResponseEntity.ok(Map.of(
+                    "message", "Feedback generation initiated",
+                    "interviewId", interviewId.toString()
+            )));
+        } catch (IllegalArgumentException e) {
+            log.warn("Feedback generation failed due to invalid argument: {}", e.getMessage());
+            return Mono.just(ResponseEntity.status(400).body(Map.of("error", (Object) e.getMessage())));
+        } catch (SecurityException e) {
+            log.warn("Unauthorized feedback generation attempt for interview {}: {}", interviewId, e.getMessage());
+            return Mono.just(ResponseEntity.status(403).body(Map.of("error", (Object) e.getMessage())));
+        } catch (Exception e) {
+            log.error("Error initiating feedback generation for interview {}", interviewId, e);
+            return Mono.just(ResponseEntity.status(500).body(Map.of("error", (Object) e.getMessage())));
         }
     }
 

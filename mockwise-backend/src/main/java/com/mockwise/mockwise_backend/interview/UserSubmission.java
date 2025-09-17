@@ -40,6 +40,25 @@ public class UserSubmission {
     @Column(name = "submitted_at", nullable = false)
     private Instant submittedAt;
     
+    @Column(name = "judge0_result", columnDefinition = "TEXT")
+    private String judge0Result; // Stores summary status (e.g., "Accepted", "Wrong Answer", "Runtime Error")
+
+    @Column(name = "test_case_results_json", columnDefinition = "TEXT")
+    private String testCaseResultsJson; // Stores detailed results for multiple test cases in JSON format
+
+    @Column(name = "stdout", columnDefinition = "TEXT")
+    private String stdout;
+
+    @Column(name = "stderr", columnDefinition = "TEXT")
+    private String stderr;
+
+    @Column(name = "compile_output", columnDefinition = "TEXT")
+    private String compileOutput;
+
+    private String time;
+
+    private String memory;
+    
     @Column(name = "claude_feedback", columnDefinition = "TEXT")
     private String claudeFeedback; // JSON string from Claude
     

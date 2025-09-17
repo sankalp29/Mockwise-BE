@@ -53,13 +53,8 @@ public class Interview {
     @OneToMany(mappedBy = "interview", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<UserSubmission> submissions;
     
-    @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-        name = "interview_questions",
-        joinColumns = @JoinColumn(name = "interview_id"),
-        inverseJoinColumns = @JoinColumn(name = "question_id")
-    )
-    private List<Question> assignedQuestions;
+    @OneToMany(mappedBy = "interview", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<InterviewQuestion> interviewQuestions;
     
     public enum Status {
         IN_PROGRESS, COMPLETED, ABANDONED

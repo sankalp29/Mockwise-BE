@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.UUID;
+import java.util.List;
 
 @Entity
 @Table(name = "questions")
@@ -35,9 +36,18 @@ public class Question {
     @Column(nullable = false)
     private Difficulty difficulty;
     
-    @Column(name = "default_template", columnDefinition = "TEXT")
-    private String defaultTemplate;
-    
+    @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<DriverCodeTemplate> driverCodeTemplates;
+
+    @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<CodeStubTemplate> codeStubTemplates;
+
+    @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<TestCase> testCases;
+
+    @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<InterviewQuestion> interviewQuestions;
+
     public enum Difficulty {
         EASY, MEDIUM, HARD
     }
