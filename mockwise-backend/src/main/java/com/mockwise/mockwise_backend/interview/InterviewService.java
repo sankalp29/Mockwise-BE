@@ -1,7 +1,11 @@
 package com.mockwise.mockwise_backend.interview;
 
 import com.mockwise.mockwise_backend.auth.SupabaseAuthService;
+
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +40,7 @@ public class InterviewService {
     private final UserSubmissionRepository userSubmissionRepository;
     private final ClaudeService claudeService;
     private final DashboardAggregateRepository dashboardAggregateRepository;
+    private final OptimalSolutionRepository optimalSolutionRepository;
 
     @Transactional
     public Interview startInterview(SupabaseAuthService.SupabaseUser user, Question.Difficulty difficulty, Integer numQuestions, Integer timeMinutes) {
@@ -89,6 +94,8 @@ public class InterviewService {
             submission.setQuestion(question);
             submission.setCode(submissionReq.getCode());
             submission.setLanguage(submissionReq.getLanguage());
+            submission.setUserTimeComplexity(submissionReq.getTimeComplexity());
+            submission.setUserSpaceComplexity(submissionReq.getSpaceComplexity());
             submission.setSubmittedAt(Instant.now());
 
             userSubmissionRepository.save(submission);
@@ -181,7 +188,13 @@ public class InterviewService {
         String problemStatement = formatProblemStatement(question);
         
         // Generate prompt for code feedback and call Claude
-        String prompt = claudeService.buildCodeFeedbackPrompt(problemStatement, submission.getCode(), submission.getLanguage());
+        String prompt = claudeService.buildCodeFeedbackPrompt(
+                problemStatement,
+                submission.getCode(),
+                submission.getLanguage(),
+                submission.getUserTimeComplexity(),
+                submission.getUserSpaceComplexity()
+        );
         log.info("Calling Claude API for submission: {}", submission.getId());
         return claudeService.callClaude(prompt)
                 .map(feedback -> {
@@ -316,29 +329,28 @@ public class InterviewService {
         return interview;
     }
 
+    public String getOptimalCode(UUID questionId, String language) {
+        return optimalSolutionRepository
+                .findByQuestionIdAndLanguage(questionId, language)
+                .map(OptimalSolution::getCode)
+                .orElse(null);
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
     public static class SubmissionRequest {
         private UUID questionId;
         private String code;
         private String language;
-
-        // Constructors
-        public SubmissionRequest() {}
+        private String timeComplexity;
+        private String spaceComplexity;
 
         public SubmissionRequest(UUID questionId, String code, String language) {
             this.questionId = questionId;
             this.code = code;
             this.language = language;
         }
-
-        // Getters and setters
-        public UUID getQuestionId() { return questionId; }
-        public void setQuestionId(UUID questionId) { this.questionId = questionId; }
-
-        public String getCode() { return code; }
-        public void setCode(String code) { this.code = code; }
-
-        public String getLanguage() { return language; }
-        public void setLanguage(String language) { this.language = language; }
     }
 
     // Placeholder for syntax checking

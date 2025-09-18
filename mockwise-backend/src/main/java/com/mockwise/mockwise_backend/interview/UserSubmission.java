@@ -45,4 +45,10 @@ public class UserSubmission {
     
     @Column(name = "feedback_generated_at")
     private Instant feedbackGeneratedAt;
+
+    @Column(name = "user_time_complexity", columnDefinition = "TEXT")
+    private String userTimeComplexity;
+
+    @Column(name = "user_space_complexity", columnDefinition = "TEXT")
+    private String userSpaceComplexity;
 }

@@ -77,8 +77,12 @@ public class ClaudeService {
         });
     }
 
-    // Helper: Generate prompt for code feedback evaluation
-    public String buildCodeFeedbackPrompt(String problemStatement, String userCode, String language) {
+    // Helper: Generate prompt for code feedback evaluation (includes optional user self-assessment)
+    public String buildCodeFeedbackPrompt(String problemStatement, String userCode, String language,
+                                          String userTimeComplexity, String userSpaceComplexity) {
+        String selfTime = (userTimeComplexity == null || userTimeComplexity.isBlank()) ? "Not provided" : userTimeComplexity;
+        String selfSpace = (userSpaceComplexity == null || userSpaceComplexity.isBlank()) ? "Not provided" : userSpaceComplexity;
+
         return String.format("""
             Evaluate the following coding problem and solution for correctness, time complexity, space complexity, clarity, readability, modularity, and provide an overall feedback and rating out of 10.
             
@@ -89,6 +93,10 @@ public class ClaudeService {
             ```%s
             %s
             ```
+            
+            **User's Self-Assessed Complexities (if any):**
+            - Time Complexity: %s
+            - Space Complexity: %s
             
             Please provide your evaluation in the following JSON format ONLY. Do not include any other text or explanation outside of this JSON:
             
@@ -103,7 +111,9 @@ public class ClaudeService {
                 "strengths": ["strength1", "strength2"],
                 "improvements": ["improvement1", "improvement2"]
             }
-            """, problemStatement, language, language, userCode);
+            
+            When analyzing time and space complexity, consider the user's self-assessment and note whether it aligns with your analysis, but keep the response strictly in the JSON schema above.
+            """, problemStatement, language, language, userCode, selfTime, selfSpace);
     }
 
     // Helper: Generate prompt for AI insights from feedback data

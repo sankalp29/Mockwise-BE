@@ -192,6 +192,26 @@ public class InterviewController {
             ));
         }
     }
+
+    @GetMapping("/optimal-code")
+    public ResponseEntity<?> getOptimalCode(
+            @RequestParam UUID questionId,
+            @RequestParam String language,
+            Authentication authentication) {
+        try {
+            log.info("Fetching optimal code for questionId: {}, language: {}", questionId, language);
+            // Ensure user is authenticated
+            extractSupabaseUser(authentication);
+            String code = interviewService.getOptimalCode(questionId, language);
+            if (code == null || code.isBlank()) {
+                return ResponseEntity.status(404).body(Map.of("error", "Optimal code not found"));
+            }
+            return ResponseEntity.ok(Map.of("code", code));
+        } catch (Exception e) {
+            log.error("Error fetching optimal code", e);
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
     
     @GetMapping("/test-auth")
     public ResponseEntity<?> testAuth(Authentication authentication) {
