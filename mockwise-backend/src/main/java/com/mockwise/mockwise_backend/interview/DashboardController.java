@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import java.util.Map;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/dashboard")
@@ -68,6 +70,56 @@ public class DashboardController {
             ));
         } catch (Exception e) {
             log.error("Error building dashboard metrics", e);
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/progress")
+    public ResponseEntity<?> getProgress(Authentication authentication) {
+        try {
+            SupabaseAuthService.SupabaseUser user = extractSupabaseUser(authentication);
+            String userId = user.getId();
+            List<Interview> interviews = interviewService.getInterviewsForUser(userId);
+
+            java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")
+                    .withZone(java.time.ZoneId.systemDefault());
+
+            List<Map<String, Object>> series = interviews.stream()
+                    .map(iv -> {
+                        double overall = 0.0;
+                        try {
+                            List<UserSubmission> subs = interviewService.getSubmissionsForUser(userId).stream()
+                                    .filter(s -> s.getInterview().getId().equals(iv.getId()))
+                                    .toList();
+                            double[] ratings = subs.stream()
+                                    .map(UserSubmission::getClaudeFeedback)
+                                    .filter(f -> f != null && !f.isBlank())
+                                    .map(interviewService::extractOverallRating)
+                                    .filter(r -> r != null && r >= 0)
+                                    .mapToDouble(Double::doubleValue)
+                                    .toArray();
+                            overall = ratings.length == 0 ? 0.0 : java.util.Arrays.stream(ratings).average().orElse(0.0);
+                        } catch (Exception ignore) {}
+
+                        long durationMin = 0L;
+                        if (iv.getEndedAt() != null && iv.getStartedAt() != null) {
+                            durationMin = Math.max(0, (iv.getEndedAt().getEpochSecond() - iv.getStartedAt().getEpochSecond()) / 60);
+                        }
+
+                        java.util.Map<String, Object> m = new java.util.HashMap<>();
+                        m.put("id", iv.getId());
+                        m.put("date", iv.getStartedAt() != null ? fmt.format(iv.getStartedAt()) : "");
+                        m.put("overallRating", Math.round(overall * 10.0) / 10.0);
+                        m.put("numQuestions", iv.getNumQuestions());
+                        m.put("difficulty", iv.getDifficulty().name().substring(0,1) + iv.getDifficulty().name().substring(1).toLowerCase());
+                        m.put("timeMinutes", iv.getTimeMinutes() != null ? iv.getTimeMinutes() : (int) durationMin);
+                        return m;
+                    })
+                    .collect(Collectors.toList());
+
+            return ResponseEntity.ok(series);
+        } catch (Exception e) {
+            log.error("Error building progress series", e);
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }

@@ -79,12 +79,12 @@ public class ClaudeService {
 
     // Helper: Generate prompt for code feedback evaluation (includes optional user self-assessment)
     public String buildCodeFeedbackPrompt(String problemStatement, String userCode, String language,
-                                          String userTimeComplexity, String userSpaceComplexity) {
+                                      String userTimeComplexity, String userSpaceComplexity) {
         String selfTime = (userTimeComplexity == null || userTimeComplexity.isBlank()) ? "Not provided" : userTimeComplexity;
         String selfSpace = (userSpaceComplexity == null || userSpaceComplexity.isBlank()) ? "Not provided" : userSpaceComplexity;
 
         return String.format("""
-            Evaluate the following coding problem and solution for correctness, time complexity, space complexity, clarity, readability, modularity, and provide an overall feedback and rating out of 10.
+            Evaluate the following coding problem and solution for correctness & optimality, time complexity, space complexity, clarity, readability, and provide an overall feedback and rating out of 10.
             
             **Problem Statement:**
             %s
@@ -98,6 +98,55 @@ public class ClaudeService {
             - Time Complexity: %s
             - Space Complexity: %s
             
+            Evaluation Rules (critical):
+
+            1) If the code has no meaningful implementation (only stubs, empty methods, comments, or incomplete skeletons):
+                - Set ALL scores to 0.
+                - For every category’s feedback, overallFeedback, strengths, and improvements:
+                    "No meaningful implementation was provided, so no evaluation is possible."
+                - Do NOT infer complexities (e.g., O(1)) from trivial/absent code.
+
+            2) If the code is only boilerplate/trivial setup without solving the problem:
+                - Give very low scores (1–2 max).
+                - Feedback must focus ONLY on substantive qualities (algorithmic design, readability, decomposition, edge cases, testability).
+                - Do NOT include shallow points such as:
+                    - “used return type”
+                    - “added access modifier”
+                    - “removed unused variable”
+                    - “initialized array”
+                    - “provided semicolon/boilerplate syntax”
+                - Feedback must highlight that the solution is incomplete and lacks problem-solving logic.
+
+            3) Otherwise, evaluate normally:
+                - Scores should reflect correctness, efficiency, readability, modularity, and robustness of the actual solution.
+
+            4) timeComplexity.score and spaceComplexity.score must be based strictly on the code (ignore user self-assessment for scoring).
+                - Feedback must:
+                    a) Analyze complexities from the submitted code.
+                    b) State if the solution is incorrect, and rate low if so.
+                    c) Explicitly compare with user’s self-assessment (if provided), stating whether they were correct, underestimated, or overestimated.
+
+            5) Strengths and Improvements Guidelines:
+                - Must exclude anything the user didn’t control (e.g., stub/template code).
+                - Do NOT include trivial/boilerplate points (see Rule 2 list).
+                - Strengths should highlight substantive positives, such as:
+                    - Correctness of algorithm and logic
+                    - Efficiency (choice of algorithm, data structures)
+                    - Code clarity, naming, readability
+                    - Good decomposition/modularity
+                    - Handling of edge cases
+                    - Testability and maintainability
+                - Improvements should identify real opportunities to grow, such as:
+                    - Optimizing time/space complexity
+                    - Improving modularity/refactoring
+                    - Handling additional edge cases
+                    - Improving naming or readability
+                    - Adding documentation or inline comments
+                - Each point must be specific, contextual, and actionable, not generic.
+                - If no meaningful strengths or improvements exist, apply Rule 1 or 2 as applicable.
+
+            6) Return ONLY the JSON object in the schema.
+
             Please provide your evaluation in the following JSON format ONLY. Do not include any other text or explanation outside of this JSON:
             
             {
@@ -105,14 +154,11 @@ public class ClaudeService {
                 "timeComplexity": {"score": 0-10, "feedback": "analysis of time complexity", "bigO": "O(n), O(log n), etc."},
                 "spaceComplexity": {"score": 0-10, "feedback": "analysis of space complexity", "bigO": "O(1), O(n), etc."},
                 "clarity": {"score": 0-10, "feedback": "feedback on code clarity"},
-                "modularity": {"score": 0-10, "feedback": "feedback on structure and modularity"},
                 "overallRating": 0-10,
                 "overallFeedback": "comprehensive overall feedback",
                 "strengths": ["strength1", "strength2"],
                 "improvements": ["improvement1", "improvement2"]
             }
-            
-            When analyzing time and space complexity, consider the user's self-assessment and note whether it aligns with your analysis, but keep the response strictly in the JSON schema above.
             """, problemStatement, language, language, userCode, selfTime, selfSpace);
     }
 
@@ -187,7 +233,6 @@ public class ClaudeService {
                 "timeComplexity": {"score": 7, "feedback": "Time complexity looks reasonable", "bigO": "O(n)"},
                 "spaceComplexity": {"score": 7, "feedback": "Space usage appears efficient", "bigO": "O(1)"},
                 "clarity": {"score": 8, "feedback": "Code is generally readable"},
-                "modularity": {"score": 7, "feedback": "Good structure and organization"},
                 "overallRating": 7,
                 "overallFeedback": "Good solution overall. %s",
                 "strengths": ["Functional correctness", "Readable structure"],

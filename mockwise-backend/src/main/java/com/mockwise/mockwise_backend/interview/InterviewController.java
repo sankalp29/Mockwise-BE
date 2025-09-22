@@ -128,6 +128,16 @@ public class InterviewController {
         }
     }
 
+    @PostMapping("/{interviewId}/generate-feedback")
+    public ResponseEntity<?> generateFeedback(@PathVariable UUID interviewId) {
+        try {
+            interviewService.generateFeedbackForInterview(interviewId).subscribe();
+            return ResponseEntity.ok(Map.of("status", "started"));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @GetMapping("/questions")
     public ResponseEntity<List<Question>> getQuestions(
             @RequestParam Question.Difficulty difficulty,
