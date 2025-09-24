@@ -162,6 +162,17 @@ public class ClaudeService {
             """, problemStatement, language, language, userCode, selfTime, selfSpace);
     }
 
+    // Overload that includes a compact JSON test report to inform evaluation
+    public String buildCodeFeedbackPrompt(String problemStatement, String userCode, String language,
+                                          String userTimeComplexity, String userSpaceComplexity,
+                                          String testReportJson) {
+        String base = buildCodeFeedbackPrompt(problemStatement, userCode, language, userTimeComplexity, userSpaceComplexity);
+        // Insert test results section before the final instructions if available
+        if (testReportJson == null || testReportJson.isBlank()) return base;
+        String testsSection = String.format("\n\nAdditional Context - Test Case Results (JSON):\n```json\n%s\n```\n\n", testReportJson);
+        return base + testsSection;
+    }
+
     // Helper: Generate prompt for AI insights from feedback data
     public String buildAIInsightsPrompt(String feedbackContext) {
         return "Given the following recent interview feedback JSON blobs, extract: strongestTopic, weakestTopic, mostCommonMistake as a JSON object with keys {\\\"strongestTopic\\\", \\\"weakestTopic\\\", \\\"mostCommonMistake\\\"}. Return ONLY the JSON.\n" + feedbackContext;

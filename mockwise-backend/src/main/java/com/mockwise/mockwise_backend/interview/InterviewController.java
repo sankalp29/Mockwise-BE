@@ -19,6 +19,7 @@ import java.util.UUID;
 public class InterviewController {
 
     private final InterviewService interviewService;
+    private final QuestionCodeStubRepository questionCodeStubRepository;
 
     @PostMapping("/start")
     public ResponseEntity<?> startInterview(
@@ -125,6 +126,24 @@ public class InterviewController {
         } catch (Exception e) {
             log.error("Error getting interview feedback", e);
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/questions/{questionId}/stub")
+    public ResponseEntity<String> getQuestionCodeStub(
+            @PathVariable UUID questionId,
+            @RequestParam String language,
+            Authentication authentication) {
+        try {
+            // Ensure user is authenticated
+            extractSupabaseUser(authentication);
+            return questionCodeStubRepository
+                    .findFirstByQuestion_IdAndLanguageIgnoreCase(questionId, language)
+                    .map(stub -> ResponseEntity.ok(stub.getStub()))
+                    .orElseGet(() -> ResponseEntity.status(404).body("// No code stub available for this language"));
+        } catch (Exception e) {
+            log.error("Error fetching code stub for question {} and language {}", questionId, language, e);
+            return ResponseEntity.status(500).body("// Error fetching stub");
         }
     }
 

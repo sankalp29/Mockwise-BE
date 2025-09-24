@@ -1,0 +1,19 @@
+<configuration>
+  <appender name="TEST_RUN_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>logs/mockwise-testruns.log</file>
+    <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+      <fileNamePattern>logs/mockwise-testruns.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+      <maxFileSize>10MB</maxFileSize>
+      <maxHistory>7</maxHistory>
+      <totalSizeCap>200MB</totalSizeCap>
+    </rollingPolicy>
+    <encoder>
+      <pattern>%d{HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <!-- Package must match your classes that emit logs -->
+  <logger name="com.mockwise.mockwise_backend.interview" level="INFO" additivity="true">
+    <appender-ref ref="TEST_RUN_FILE"/>
+  </logger>
+</configuration>
