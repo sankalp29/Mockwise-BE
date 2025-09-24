@@ -8,6 +8,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -304,7 +305,6 @@ public class InterviewController {
             Authentication authentication) {
         log.info("Checking syntax for language: {}", request.getLanguage());
         try {
-            SupabaseAuthService.SupabaseUser user = extractSupabaseUser(authentication);
             List<String> errors = interviewService.checkSyntax(request.getCode(), request.getLanguage());
             return ResponseEntity.ok(Map.of("errors", errors));
         } catch (Exception e) {
@@ -312,6 +312,40 @@ public class InterviewController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
+
+    @GetMapping("/ongoing")
+    public ResponseEntity<?> getOngoingInterview(Authentication authentication) {
+        try {
+            SupabaseAuthService.SupabaseUser user = extractSupabaseUser(authentication);
+            log.info("Checking for ongoing interview for user: {}", user.getEmail());
+            
+            Interview ongoingInterview = interviewService.findOngoingInterviewByUserId(user.getId());
+            
+            if (ongoingInterview != null) {
+                // Calculate remaining time
+                Instant now = Instant.now();
+                long elapsedMinutes = java.time.Duration.between(ongoingInterview.getStartedAt(), now).toMinutes();
+                long remainingMinutes = ongoingInterview.getTimeMinutes() - elapsedMinutes;
+                
+                return ResponseEntity.ok(Map.of(
+                    "hasOngoingInterview", true,
+                    "interviewId", ongoingInterview.getId(),
+                    "startedAt", ongoingInterview.getStartedAt(),
+                    "difficulty", ongoingInterview.getDifficulty(),
+                    "numQuestions", ongoingInterview.getNumQuestions(),
+                    "timeMinutes", ongoingInterview.getTimeMinutes(),
+                    "elapsedMinutes", elapsedMinutes,
+                    "remainingMinutes", Math.max(0, remainingMinutes)
+                ));
+            } else {
+                return ResponseEntity.ok(Map.of("hasOngoingInterview", false));
+            }
+        } catch (Exception e) {
+            log.error("Error checking for ongoing interview", e);
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to check for ongoing interview"));
+        }
+    }
+
 
     public static class CheckSyntaxRequest {
         private String code;

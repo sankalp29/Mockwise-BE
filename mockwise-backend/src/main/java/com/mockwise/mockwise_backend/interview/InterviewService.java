@@ -551,4 +551,35 @@ public class InterviewService {
         List<String> output = executeCommand(command, tempDir, sourceFile.getName());
         return output; // g++ only outputs errors to stderr, which is redirected to output
     }
+
+    public Interview findOngoingInterviewByUserId(String userId) {
+        List<Interview> inProgressInterviews = interviewRepository.findByUserIdAndStatus(userId, Interview.Status.IN_PROGRESS);
+        
+        for (Interview interview : inProgressInterviews) {
+            // Check if the interview is still ongoing based on time
+            if (isInterviewStillOngoing(interview)) {
+                return interview;
+            } else {
+                // If interview time has expired, mark it as abandoned
+                interview.setStatus(Interview.Status.ABANDONED);
+                interview.setEndedAt(Instant.now());
+                interviewRepository.save(interview);
+                log.info("Interview {} expired and marked as abandoned", interview.getId());
+            }
+        }
+        
+        return null;
+    }
+    
+    private boolean isInterviewStillOngoing(Interview interview) {
+        Instant now = Instant.now();
+        Instant startTime = interview.getStartedAt();
+        long durationMinutes = interview.getTimeMinutes();
+        
+        // Calculate if the interview is still within its time limit
+        long elapsedMinutes = java.time.Duration.between(startTime, now).toMinutes();
+        
+        return elapsedMinutes < durationMinutes;
+    }
+
 }
