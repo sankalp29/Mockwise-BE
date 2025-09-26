@@ -35,9 +35,6 @@ public class Question {
     @Column(nullable = false)
     private Difficulty difficulty;
     
-    @Column(name = "default_template", columnDefinition = "TEXT")
-    private String defaultTemplate;
-    
     public enum Difficulty {
         EASY, MEDIUM, HARD
     }
