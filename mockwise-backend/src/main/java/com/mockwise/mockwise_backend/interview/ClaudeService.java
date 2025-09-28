@@ -80,24 +80,24 @@ public class ClaudeService {
     // Helper: Generate prompt for code feedback evaluation (includes optional user self-assessment)
     public String buildCodeFeedbackPrompt(String problemStatement, String userCode, String language,
                                       String userTimeComplexity, String userSpaceComplexity) {
-        String selfTime = (userTimeComplexity == null || userTimeComplexity.isBlank()) ? "Not provided" : userTimeComplexity;
-        String selfSpace = (userSpaceComplexity == null || userSpaceComplexity.isBlank()) ? "Not provided" : userSpaceComplexity;
+    String selfTime = (userTimeComplexity == null || userTimeComplexity.isBlank()) ? "Not provided" : userTimeComplexity;
+    String selfSpace = (userSpaceComplexity == null || userSpaceComplexity.isBlank()) ? "Not provided" : userSpaceComplexity;
 
-        return String.format("""
+    return String.format("""
             Evaluate the following coding problem and solution for correctness & optimality, time complexity, space complexity, clarity, readability, and provide an overall feedback and rating out of 10.
-            
-            **Problem Statement:**
-            %s
-            
+
+        **Problem Statement:**
+        %s
+
             **User's Solution (%s):**
-            ```%s
-            %s
-            ```
-            
+        ```%s
+        %s
+        ```
+
             **User's Self-Assessed Complexities (if any):**
-            - Time Complexity: %s
-            - Space Complexity: %s
-            
+        - Time Complexity: %s
+        - Space Complexity: %s
+
             Evaluation Rules (critical):
             - If the code has no meaningful implementation (only stubs, empty methods, comments, or incomplete skeletons):
                 - Set ALL scores to 0.
@@ -108,9 +108,9 @@ public class ClaudeService {
             1) Correctness Rubric:
                  - Correctness is the highest priority; all other evaluations depend on a working solution.
                  - The solution must solve the stated problem for all valid inputs, including edge cases such as:
-                    - Empty input
+                - Empty input
                     - Maximum/minimum values
-                    - Duplicate elements
+                - Duplicate elements
                     - Special or boundary cases defined by constraints
                 - If the solution is incorrect or fails edge cases, assign a low correctness score (≤ 2/10).
                 - Why marks have been deducted (if any)
