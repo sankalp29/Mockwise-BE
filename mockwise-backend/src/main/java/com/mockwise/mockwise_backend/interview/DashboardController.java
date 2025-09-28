@@ -54,9 +54,6 @@ public class DashboardController {
                         .format(agg.getLastMockDate())
                     : "";
 
-            String insights = interviewService.getInsightsJson(userId);
-            insights = insights != null ? insights : "No insights available";
-
             return ResponseEntity.ok(Map.of(
                     "totalInterviews", totalMocks,
                     "totalTimeSpentSeconds", totalSeconds,
@@ -65,8 +62,7 @@ public class DashboardController {
                     "lowestScore", lowScore,
                     "averageTimePerQuestionSeconds", avgTimePerQuestionSec,
                     "averageScoreByDifficulty", scoreByDifficulty,
-                    "lastMockDate", lastMock,
-                    "aiInsights", insights
+                    "lastMockDate", lastMock
             ));
         } catch (Exception e) {
             log.error("Error building dashboard metrics", e);
@@ -124,13 +120,6 @@ public class DashboardController {
         }
     }
 
-    @GetMapping("/insights")
-    public ResponseEntity<?> getInsights(Authentication authentication) {
-        SupabaseAuthService.SupabaseUser user = extractSupabaseUser(authentication);
-        String userId = user.getId();
-        String insights = interviewService.getInsightsJson(userId);
-        return ResponseEntity.ok(Map.of("aiInsights", insights));
-    }
 
     private SupabaseAuthService.SupabaseUser extractSupabaseUser(Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) {

@@ -63,12 +63,6 @@ public class DashboardAggregate {
     @Column(name = "updated_at")
     private Instant updatedAt;
 
-    // AI Insights (cached)
-    @Column(name = "insights_json", columnDefinition = "TEXT")
-    private String insightsJson;
-
-    @Column(name = "insights_interview_count")
-    private Integer insightsInterviewCount; // number of totalMocks when insights were last generated
 }
 
 

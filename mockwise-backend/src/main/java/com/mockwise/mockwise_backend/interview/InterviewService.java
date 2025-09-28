@@ -40,8 +40,6 @@ public class InterviewService {
     private final UserSubmissionRepository userSubmissionRepository;
     private final ClaudeService claudeService;
     private final DashboardAggregateRepository dashboardAggregateRepository;
-    private final TestRunnerService testRunnerService;
-    private final SubmissionTestResultRepository submissionTestResultRepository;
     private final OptimalSolutionRepository optimalSolutionRepository;
 
     @Transactional
@@ -125,8 +123,7 @@ public class InterviewService {
                                 iv.setAggregated(true);
                                 interviewRepository.save(iv);
                             }
-                            log.info("Calling computeAIInsights for user: {}", iv.getUserId());
-                            computeAIInsights(iv.getUserId());
+                            log.info("Post-feedback processing completed for interview: {}", iv.getId());
                         } else {
                             log.warn("Interview not found for post-processing: {}", interviewId);
                         }
@@ -190,56 +187,12 @@ public class InterviewService {
         String problemStatement = formatProblemStatement(question);
         
         // Generate prompt for code feedback and call Claude
-        // 1) Run tests via Judge0 and persist results
-        String testReportJson = null;
-        try {
-            var results = testRunnerService.runAll(question.getId(), submission.getLanguage(), submission.getCode());
-            // persist
-            for (TestRunnerService.TestCaseResult r : results) {
-                SubmissionTestResult ent = new SubmissionTestResult();
-                ent.setSubmission(submission);
-                ent.setTestCase(testRunnerService.getTestCase(r.testCaseId()));
-                ent.setPassed(r.passed());
-                ent.setActualJson(r.actualJson());
-                ent.setTimeMs(r.timeMs());
-                ent.setMemoryKb(r.memoryKb());
-                ent.setStderr(r.stderr());
-                submissionTestResultRepository.save(ent);
-            }
-            // build compact report for Claude
-            var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-            java.util.ArrayList<java.util.Map<String,Object>> compact = new java.util.ArrayList<>();
-            for (TestRunnerService.TestCaseResult r : results) {
-                compact.add(java.util.Map.of(
-                        "testCaseId", r.testCaseId().toString(),
-                        "passed", r.passed(),
-                        "actual", r.actualJson()
-                ));
-            }
-            testReportJson = mapper.writeValueAsString(java.util.Map.of(
-                    "questionId", question.getId().toString(),
-                    "results", compact
-            ));
-
-            log.info("*** Test report JSON: *** {}", testReportJson);
-        } catch (Exception e) {
-            log.warn("Test execution failed for submission {}: {}", submission.getId(), e.getMessage());
-        }
-
-        String prompt = (testReportJson == null)
-                ? claudeService.buildCodeFeedbackPrompt(
-                    problemStatement,
-                    submission.getCode(),
-                    submission.getLanguage(),
-                    submission.getUserTimeComplexity(),
-                    submission.getUserSpaceComplexity())
-                : claudeService.buildCodeFeedbackPrompt(
-                    problemStatement,
-                    submission.getCode(),
-                    submission.getLanguage(),
-                    submission.getUserTimeComplexity(),
-                    submission.getUserSpaceComplexity(),
-                    testReportJson);
+        String prompt = claudeService.buildCodeFeedbackPrompt(
+            problemStatement,
+            submission.getCode(),
+            submission.getLanguage(),
+            submission.getUserTimeComplexity(),
+            submission.getUserSpaceComplexity());
         log.info("Calling Claude API for submission: {}", submission.getId());
         return claudeService.callClaude(prompt)
                 .map(feedback -> {
@@ -311,45 +264,7 @@ public class InterviewService {
         return null;
     }
 
-    public String getInsightsJson(String userId) {
-        return dashboardAggregateRepository.findByUserId(userId)
-                .map(DashboardAggregate::getInsightsJson)
-                .orElse(null);
-    }
 
-    // AI Insights: compute if a new interview exists since last cache
-    public void computeAIInsights(String userId) {
-        log.info("*****STARTING AI INSIGHTS GENERATION for user: {}******", userId);
-        DashboardAggregate agg = dashboardAggregateRepository.findByUserId(userId).orElse(null);
-        if (agg == null) {
-            log.warn("No DashboardAggregate found for user: {}", userId);
-            return;
-        }
-        int interviewCount = agg.getTotalMocks();
-
-        var recent = interviewRepository.findByUserIdOrderByStartedAtDesc(userId);
-        recent = recent.subList(0, Math.min(5, recent.size()));
-        var subs = new java.util.ArrayList<UserSubmission>();
-        for (Interview i : recent) {
-            subs.addAll(userSubmissionRepository.findByInterviewId(i.getId()));
-        }
-
-        StringBuilder ctx = new StringBuilder();
-        for (UserSubmission s : subs) {
-            if (s.getClaudeFeedback() != null) {
-                ctx.append("\nSubmission Feedback:\n").append(s.getClaudeFeedback()).append("\n");
-            }
-        }
-        log.info("**** Previous Feedbacks Context:**** {}", ctx.toString());
-        // Generate prompt for AI insights and call Claude
-        String prompt = claudeService.buildAIInsightsPrompt(ctx.toString());
-        String insightsJson = claudeService.callClaude(prompt).blockOptional().orElse("{}");
-        log.info("AI Insights JSON: {}", insightsJson);
-        agg.setInsightsJson(insightsJson);
-        agg.setInsightsInterviewCount(interviewCount);
-        agg.setUpdatedAt(Instant.now());
-        dashboardAggregateRepository.save(agg);
-    }
 
     public Interview getInterviewWithFeedback(UUID interviewId) {
         return interviewRepository.findById(interviewId)
@@ -405,7 +320,7 @@ public class InterviewService {
         File tempDir = null;
 
         try {
-            tempDir = Files.createTempDirectory("syntax_check_test").toFile();
+            tempDir = Files.createTempDirectory("syntax_check").toFile();
 
             switch (language.toLowerCase()) {
                 case "java":

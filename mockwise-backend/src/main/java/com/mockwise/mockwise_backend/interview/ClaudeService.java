@@ -99,53 +99,140 @@ public class ClaudeService {
             - Space Complexity: %s
             
             Evaluation Rules (critical):
-
-            1) If the code has no meaningful implementation (only stubs, empty methods, comments, or incomplete skeletons):
+            - If the code has no meaningful implementation (only stubs, empty methods, comments, or incomplete skeletons):
                 - Set ALL scores to 0.
                 - For every category’s feedback, overallFeedback, strengths, and improvements:
                     "No meaningful implementation was provided, so no evaluation is possible."
                 - Do NOT infer complexities (e.g., O(1)) from trivial/absent code.
 
-            2) If the code is only boilerplate/trivial setup without solving the problem:
-                - Give very low scores (1–2 max).
-                - Feedback must focus ONLY on substantive qualities (algorithmic design, readability, decomposition, edge cases, testability).
-                - Do NOT include shallow points such as:
-                    - “used return type”
-                    - “added access modifier”
-                    - “removed unused variable”
-                    - “initialized array”
-                    - “provided semicolon/boilerplate syntax”
-                - Feedback must highlight that the solution is incomplete and lacks problem-solving logic.
+            1) Correctness Rubric:
+                 - Correctness is the highest priority; all other evaluations depend on a working solution.
+                 - The solution must solve the stated problem for all valid inputs, including edge cases such as:
+                    - Empty input
+                    - Maximum/minimum values
+                    - Duplicate elements
+                    - Special or boundary cases defined by constraints
+                - If the solution is incorrect or fails edge cases, assign a low correctness score (≤ 2/10).
+                - Why marks have been deducted (if any)
+                Strengths (Correctness)
+                    - Correctly implements the algorithm for the problem.
+                    - Handles edge cases robustly (empty inputs, extreme values, duplicates).
+                    - Produces accurate results consistently for valid inputs.
+                Improvements (Correctness)
+                    - Missing handling for edge cases (e.g., empty array, zero values, maximum constraints).
+                    - Fails to cover certain input scenarios defined in constraints.
+                    - Logic produces wrong results for some inputs due to incorrect conditional checks or loop bounds.
 
-            3) Otherwise, evaluate normally:
-                - Scores should reflect correctness, efficiency, readability, modularity, and robustness of the actual solution.
+                Score Range
+                Score	Description
+                9–10	Fully correct solution, handles all edge cases.
+                7–8	    Mostly correct, minor issues with some edge cases.
+                5–6	    Partially correct; misses multiple cases, but some logic is right.
+                ≤4	    Incorrect solution; fails most or all cases.
 
-            4) timeComplexity.score and spaceComplexity.score must be based strictly on the code (ignore user self-assessment for scoring).
-                - Feedback must:
-                    a) Analyze complexities from the submitted code.
-                    b) State if the solution is incorrect, and rate low if so.
-                    c) Explicitly compare with user’s self-assessment (if provided), stating whether they were correct, underestimated, or overestimated.
+            2) Scoring Rubric for Time & Space Complexity:
+                A. Complexity Analysis (from Code Only)
+                    - Both time and space complexity must be derived strictly from the submitted code.
+                    - Ignore user’s self-assessment when calculating the actual score.
+                    - Time complexity should be prioritized over space complexity: a slower algorithm is penalized more than extra memory usage.
 
-            5) Strengths and Improvements Guidelines:
-                - Must exclude anything the user didn’t control (e.g., stub/template code).
-                - Do NOT include trivial/boilerplate points (see Rule 2 list).
-                - Strengths should highlight substantive positives, such as:
-                    - Correctness of algorithm and logic
-                    - Efficiency (choice of algorithm, data structures)
-                    - Code clarity, naming, readability
-                    - Good decomposition/modularity
-                    - Handling of edge cases
-                    - Testability and maintainability
-                - Improvements should identify real opportunities to grow, such as:
-                    - Optimizing time/space complexity
-                    - Improving modularity/refactoring
-                    - Handling additional edge cases
-                    - Improving naming or readability
-                    - Adding documentation or inline comments
-                - Each point must be specific, contextual, and actionable, not generic.
-                - If no meaningful strengths or improvements exist, apply Rule 1 or 2 as applicable.
+                B. Solution Correctness
+                    - If the solution is incorrect, assign a low score (≤ 2/10) regardless of complexity claims.
+                
+                C. Comparison with User’s Self-Assessment (if provided)
+                    - Correct self-assessment → award full marks in the comparison section.
+                    - Underestimated/Overestimated → note the mismatch in feedback, partial marks allowed.
 
-            6) Return ONLY the JSON object in the schema.
+                D. Missing or Incorrect Complexity Assessment (penalty rules)
+                    - No assessment provided by user → deduct 2 marks from both time and space complexity scores.
+                    - Incorrect assessment provided → deduct 2 marks from the respective score.
+                    - Correct assessment provided → no deduction.
+
+                E. Efficiency vs Optimality (Time & Space)
+                Time First:
+                    - If the solution is efficient but not time-optimal, highlight explicitly (e.g., O(N log N) when O(N) is achievable, or multiple passes when fewer are possible).
+                    - Award slightly reduced marks (e.g., 8/10 instead of 9–10).
+                Space Second:
+                    - If the solution uses extra memory unnecessarily (e.g., O(N) extra when O(1) is possible), highlight explicitly.
+                    - Award slightly reduced marks accordingly.
+                Optimal in Both Time and Space: full marks.
+                Rule of Thumb: prioritize time efficiency first; only optimize space once time is optimal.
+                - Why marks have been deducted (if any)
+
+                F. Score Range
+                    Score	Description
+                    9–10	Correct, optimal in both time and space.
+                    7–8	    Correct, efficient but suboptimal in either time or space (extra passes, higher constants, unnecessary extra memory).
+                    5–6	    Correct but inefficient (e.g., O(N²) time when O(N) expected, or O(N²) space when O(N) possible), OR missing/incorrect assessment.
+                    ≤ 4	    Incorrect solution or very poor efficiency.
+
+
+            3) Code Clarity & Readability Rubric
+                - Evaluation Rules
+                    - Evaluate naming, structure, decomposition, and readability.
+                    - Code clarity does not excuse incorrect logic, but contributes to maintainability and reviewability.
+                Strengths
+                    - Descriptive variable and function names.
+                    - Logical code flow; easy to understand without extra context.
+                    - Proper decomposition into reusable functions or methods.
+                    - Minimal duplication and clean control structures.
+                Improvements
+                    - Confusing variable names or unclear logic.
+                    - Long monolithic functions instead of modular methods.
+                    - Repetition of code that could be refactored into helper functions.
+                    - Nested or complex loops/conditionals that reduce readability.
+                    - Why marks have been deducted (if any)
+
+                Score Range
+                Score	Description
+                9–10	Highly readable, modular, and maintainable.
+                7–8	    Readable, minor improvements possible.
+                5–6	    Moderate clarity; some parts confusing or repetitive.
+                ≤4	    Poor readability, confusing logic, unmaintainable.
+
+
+            4) Strengths Rubric (Detailed Positive Feedback)
+                - Evaluation Rules
+                    - Highlight substantive positives, not trivial points (exclude stubs/boilerplate).
+                    - Must be specific and actionable, giving users insight into what they did well.
+                - Examples of Strengths to Highlight
+                    - Correct algorithm choice and logic implementation.
+                    - Efficient data structures or operations (time or space optimal).
+                    - Good modularity and function decomposition.
+                    - Handles edge cases effectively.
+                    - Clear and readable variable names and logical flow.
+                    - Scalable solution design that can handle large inputs.
+
+
+            5) Areas for Improvement Rubric (Detailed Growth Feedback)
+                Evaluation Rules
+                    - Identify real opportunities for improvement that would make the solution better.
+                    - Focus on correctness, efficiency, modularity, readability, and maintainability.
+                Examples of Improvements to Highlight
+                    - Logic corrections for unhandled edge cases.
+
+                    - Optimize time complexity (e.g., reduce unnecessary loops or repeated operations).
+                    - Optimize space complexity (e.g., use in-place operations or more compact data structures).
+                    - Refactor repetitive or monolithic code into modular helper methods.
+                    - Improve variable naming, readability, and clarity of complex logic.
+                    - Consider scalability and maintainability for larger input sizes.
+
+            6) Overall Feedback Rubric
+                - Evaluation Rules
+                    - Provide a summary of the user’s code quality, covering correctness, efficiency, clarity, strengths, and improvements.
+                    - Must be specific, actionable, and contextual.
+                Strengths
+                    - Summarize the most important positive aspects of the solution.
+                    - Highlight correctness, efficient algorithms, good decomposition, and clarity.
+                Areas for Improvement
+                    - Summarize critical growth opportunities across correctness, efficiency, modularity, and readability.
+                    - Include high-priority fixes first (correctness → time → space → readability).
+
+                Score Guidelines
+                - Combine individual scores (correctness, clarity, complexity) for a holistic rating.
+                - Provide clear rationale for strengths vs. improvements.
+
+            7) Return ONLY the JSON object in the schema.
 
             Please provide your evaluation in the following JSON format ONLY. Do not include any other text or explanation outside of this JSON:
             
@@ -162,22 +249,7 @@ public class ClaudeService {
             """, problemStatement, language, language, userCode, selfTime, selfSpace);
     }
 
-    // Overload that includes a compact JSON test report to inform evaluation
-    public String buildCodeFeedbackPrompt(String problemStatement, String userCode, String language,
-                                          String userTimeComplexity, String userSpaceComplexity,
-                                          String testReportJson) {
-        String base = buildCodeFeedbackPrompt(problemStatement, userCode, language, userTimeComplexity, userSpaceComplexity);
-        // Insert test results section before the final instructions if available
-        if (testReportJson == null || testReportJson.isBlank()) return base;
-        String testsSection = String.format("\n\nAdditional Context - Test Case Results (JSON):\n```json\n%s\n```\n\n", testReportJson);
-        return base + testsSection;
-    }
-
-    // Helper: Generate prompt for AI insights from feedback data
-    public String buildAIInsightsPrompt(String feedbackContext) {
-        return "Given the following recent interview feedback JSON blobs, extract: strongestTopic, weakestTopic, mostCommonMistake as a JSON object with keys {\\\"strongestTopic\\\", \\\"weakestTopic\\\", \\\"mostCommonMistake\\\"}. Return ONLY the JSON.\n" + feedbackContext;
-    }
-
+    
     private String extractContentFromResponse(String response) {
         try {
             JsonNode root = objectMapper.readTree(response);
