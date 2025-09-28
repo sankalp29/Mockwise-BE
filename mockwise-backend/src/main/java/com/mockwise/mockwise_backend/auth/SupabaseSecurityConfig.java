@@ -30,7 +30,7 @@ public class SupabaseSecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/", "/health", "/api/interview/questions", "/api/interview/*/submit", "/api/interview/*/feedback").permitAll()
+                .requestMatchers("/", "/health").permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(supabaseAuthFilter, UsernamePasswordAuthenticationFilter.class);
