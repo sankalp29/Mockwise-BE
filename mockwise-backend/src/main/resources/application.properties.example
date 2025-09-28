@@ -6,7 +6,7 @@ server.port=8080
 
 # --- Supabase PostgreSQL datasource ---
 # Replace with your actual Supabase database URL and credentials
-spring.datasource.url=jdbc:postgresql://aws-1-ap-south-1.pooler.supabase.com:5432/postgres?user=postgres.wpigzuuqotijpyeibzkc&password=Cricket@2961999
+spring.datasource.url=jdbc:postgresql://your-supabase-host:5432/postgres?user=your-username&password=your-password
 spring.datasource.driver-class-name=org.postgresql.Driver
 
 # JPA/Hibernate
@@ -24,7 +24,7 @@ spring.jpa.properties.hibernate.jdbc.lob.non_contextual_creation=true
 spring.datasource.hikari.pool-name=HikariPool
 # keep small, PgBouncer already pools
 spring.datasource.hikari.maximum-pool-size=5       
-# don’t keep idle connections around
+# don't keep idle connections around
 spring.datasource.hikari.minimum-idle=0
 # 10s before closing idle
 spring.datasource.hikari.idle-timeout=10000
@@ -47,18 +47,18 @@ app.base-url=http://localhost:8080
 app.frontend-url=http://localhost:5173
 
 # Claude API Configuration
-claude.api.key=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
+claude.api.key=your-claude-api-key
 claude.api.url=https://api.anthropic.com
 
 # Supabase Configuration
-supabase.url=https://wpigzuuqotijpyeibzkc.supabase.co
-supabase.anon.key=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndwaWd6dXVxb3RpanB5ZWliemtjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyODUxODUsImV4cCI6MjA3MDg2MTE4NX0.xCZ-rqRAPzsXcMf3PTxMLw6OiztHi7crEQbto6xjnwc
-supabase.service.key=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndwaWd6dXVxb3RpanB5ZWliemtjIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NTI4NTE4NSwiZXhwIjoyMDcwODYxMTg1fQ.HZUD0MscAhor4vNv6k83Lbr-S4MAo8bl9PCLp9cBuTA
+supabase.url=your-supabase-url
+supabase.anon.key=your-supabase-anon-key
+supabase.service.key=your-supabase-service-key
 debug=false
 
 # Judge0 API Configuration
 judge0.api.url=https://judge0-ce.p.rapidapi.com
-judge0.api.key=f659d5e788msh703a03d55e94defp14e7a6jsn3a9f55a6d75f
+judge0.api.key=your-judge0-api-key
 
 # Spring Profile
 spring.profiles.active=dev
