@@ -99,11 +99,12 @@ public class ClaudeService {
         - Space Complexity: %s
 
         *Critical Evaluation Rules:*
-        - If the code has no meaningful implementation (only stubs, empty methods, comments, or incomplete skeletons):
-            - Set ALL scores to 0.
-            - For every category’s feedback, overallFeedback, strengths, and improvements:
-              "No meaningful implementation was provided, so no evaluation is possible."
-            - Do NOT infer complexities (e.g., O(1)) from trivial/absent code.
+        Global Stub Rule (Overrides all other category rules):
+        If the code has no meaningful implementation (only stubs, empty methods, comments, or incomplete skeletons):
+        - Set ALL scores (correctness, optimality, timeComplexity, spaceComplexity, clarity) to 0.
+        - For every category’s feedback, overallFeedback, strengths, and improvements: "No meaningful implementation was provided, so no evaluation is possible."
+        - Do NOT infer any time/space complexities.
+        - This rule ALWAYS takes precedence over the category-specific scoring rubrics below.
 
         ### 1) Correctness (Highest Priority)
         - Correctness is the foundation; if the solution is incorrect, all other scores (optimality, complexity) must also be 0.
@@ -142,7 +143,7 @@ public class ClaudeService {
         - 5–6: Works but inefficient or missing/incorrect assessment.
         - ≤4: Incorrect solution or very poor efficiency.
 
-        ### 4) Code Clarity & Readability
+        ### 4) Code Clarity & Readability (Only if Correctness > 0)
         - Focus on structure, naming, and maintainability.
         - Do NOT penalize for missing comments (not required in interviews).
         - Deduct only if code is confusing, repetitive, or poorly structured.
@@ -170,7 +171,7 @@ public class ClaudeService {
 
         {
             "correctness": {"score": 0-10, "feedback": "detailed feedback on correctness"},
-            "optimality": {"score": 0-10, "feedback": "feedback on optimality"},
+            "optimality": {"score": 0-10, "feedback": "detailed feedback on optimality"},
             "timeComplexity": {"score": 0-10, "feedback": "analysis of time complexity", "bigO": "O(n), O(log n), etc."},
             "spaceComplexity": {"score": 0-10, "feedback": "analysis of space complexity", "bigO": "O(1), O(n), etc."},
             "clarity": {"score": 0-10, "feedback": "feedback on code clarity"},
