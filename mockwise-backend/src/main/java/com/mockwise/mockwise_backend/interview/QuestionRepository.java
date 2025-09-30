@@ -19,4 +19,16 @@ public interface QuestionRepository extends JpaRepository<Question, UUID> {
     // Fallback method without RANDOM() in case of issues
     @Query("SELECT q FROM Question q WHERE q.difficulty = :difficulty")
     List<Question> findByDifficultyString(@Param("difficulty") Question.Difficulty difficulty);
+    
+    // Find questions excluding seen ones
+    @Query(value = "SELECT * FROM questions WHERE difficulty = :difficulty AND id NOT IN :excludeIds ORDER BY RANDOM() LIMIT :limit", 
+           nativeQuery = true)
+    List<Question> findRandomQuestionsByDifficultyExcluding(@Param("difficulty") String difficulty, 
+                                                           @Param("excludeIds") List<UUID> excludeIds, 
+                                                           @Param("limit") int limit);
+    
+    // Fallback for excluding seen questions
+    @Query("SELECT q FROM Question q WHERE q.difficulty = :difficulty AND q.id NOT IN :excludeIds")
+    List<Question> findByDifficultyExcluding(@Param("difficulty") Question.Difficulty difficulty, 
+                                            @Param("excludeIds") List<UUID> excludeIds);
 }

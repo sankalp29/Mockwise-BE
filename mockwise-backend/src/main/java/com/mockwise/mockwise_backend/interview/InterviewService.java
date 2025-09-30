@@ -41,14 +41,15 @@ public class InterviewService {
     private final ClaudeService claudeService;
     private final DashboardAggregateRepository dashboardAggregateRepository;
     private final OptimalSolutionRepository optimalSolutionRepository;
+    private final UserQuestionSeenRepository userQuestionSeenRepository;
 
     @Transactional
     public Interview startInterview(SupabaseAuthService.SupabaseUser user, Question.Difficulty difficulty, Integer numQuestions, Integer timeMinutes) {
         log.info("Starting interview for user: {} with difficulty: {}, questions: {}, time: {}", 
                  user.getEmail(), difficulty, numQuestions, timeMinutes);
 
-        // Get random questions for this interview
-        List<Question> assignedQuestions = getRandomQuestions(difficulty, numQuestions);
+        // Get random questions for this interview (user-specific to avoid seen questions)
+        List<Question> assignedQuestions = getRandomQuestionsForUser(user.getId(), difficulty, numQuestions);
         log.info("Assigned {} questions to interview", assignedQuestions.size());
 
         Interview interview = new Interview();
@@ -101,7 +102,12 @@ public class InterviewService {
             userSubmissionRepository.save(submission);
         }
 
-        return interviewRepository.save(interview);
+        Interview savedInterview = interviewRepository.save(interview);
+        
+        // Mark questions as seen by the user
+        markQuestionsAsSeen(interview.getUserId(), savedInterview);
+        
+        return savedInterview;
     }
 
     public Mono<Void> generateFeedbackForInterview(UUID interviewId) {
@@ -220,9 +226,66 @@ public class InterviewService {
         return sb.toString();
     }
 
-    public List<Question> getRandomQuestions(Question.Difficulty difficulty, int count) {
-        log.info("Requesting {} random questions with difficulty: {}", count, difficulty);
+    public List<Question> getRandomQuestionsForUser(String userId, Question.Difficulty difficulty, int count) {
+        log.info("Requesting {} random questions with difficulty: {} for user: {}", count, difficulty, userId);
         
+        List<Question> questions;
+        
+        if (userId != null) {
+            // User-specific logic: exclude seen questions
+            questions = getRandomQuestionsExcludingSeen(userId, difficulty, count);
+        } else {
+            // Original logic for backward compatibility
+            questions = getRandomQuestionsOriginal(difficulty, count);
+        }
+        
+        return questions;
+    }
+    
+    private List<Question> getRandomQuestionsExcludingSeen(String userId, Question.Difficulty difficulty, int count) {
+        // Get seen question IDs for this user and difficulty
+        List<UUID> seenQuestionIds = userQuestionSeenRepository.findSeenQuestionIdsByUserAndDifficulty(userId, difficulty);
+        log.info("User {} has seen {} questions of difficulty {}", userId, seenQuestionIds.size(), difficulty);
+        
+        // Get total questions count for this difficulty
+        long totalCount = userQuestionSeenRepository.countTotalQuestionsByDifficulty(difficulty);
+        long unseenCount = totalCount - seenQuestionIds.size();
+        
+        // Smart reset logic: if not enough unseen questions available, reset all seen questions
+        if (unseenCount < count) {
+            log.info("User {} has only {} unseen questions but requested {}. Resetting all seen questions for difficulty {}.", 
+                    userId, unseenCount, count, difficulty);
+            // Reset seen questions for this difficulty
+            userQuestionSeenRepository.deleteByUserIdAndDifficulty(userId, difficulty);
+            seenQuestionIds = new ArrayList<>(); // Clear the list
+        }
+        
+        List<Question> questions;
+        try {
+            if (seenQuestionIds.isEmpty()) {
+                // No seen questions, use original random query
+                questions = questionRepository.findRandomQuestionsByDifficulty(difficulty.name(), count);
+            } else {
+                // Exclude seen questions
+                questions = questionRepository.findRandomQuestionsByDifficultyExcluding(difficulty.name(), seenQuestionIds, count);
+            }
+            log.info("Found {} questions using random query (excluding seen)", questions.size());
+        } catch (Exception e) {
+            log.warn("Random query failed, using fallback: ", e);
+            if (seenQuestionIds.isEmpty()) {
+                List<Question> allQuestions = questionRepository.findByDifficultyString(difficulty);
+                questions = allQuestions.stream().limit(count).toList();
+            } else {
+                questions = questionRepository.findByDifficultyExcluding(difficulty, seenQuestionIds);
+                questions = questions.stream().limit(count).toList();
+            }
+            log.info("Found {} questions using fallback query (excluding seen)", questions.size());
+        }
+        
+        return questions;
+    }
+    
+    private List<Question> getRandomQuestionsOriginal(Question.Difficulty difficulty, int count) {
         // First check total questions available
         long totalQuestions = questionRepository.count();
         log.info("Total questions in database: {}", totalQuestions);
@@ -239,6 +302,40 @@ public class InterviewService {
         }
         
         return questions;
+    }
+    
+    /**
+     * Mark questions as seen by a user when they complete an interview
+     * Simplified approach to avoid connection leaks
+     */
+    public void markQuestionsAsSeen(String userId, Interview interview) {
+        log.info("Marking questions as seen for user: {} in interview: {}", userId, interview.getId());
+        
+        try {
+            Question.Difficulty difficulty = interview.getDifficulty();
+            
+            // Simple approach: mark each question individually with error handling
+            for (InterviewQuestion link : interview.getAssignedQuestionLinks()) {
+                UUID questionId = link.getQuestion().getId();
+                
+                try {
+                    // Check if already exists to avoid duplicates
+                    if (!userQuestionSeenRepository.existsByUserIdAndQuestionId(userId, questionId)) {
+                        UserQuestionSeen seen = new UserQuestionSeen(userId, questionId, difficulty);
+                        userQuestionSeenRepository.save(seen);
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to mark question {} as seen for user {}: {}", questionId, userId, e.getMessage());
+                    // Continue with other questions
+                }
+            }
+            
+            log.info("Completed marking questions as seen for user: {}", userId);
+            
+        } catch (Exception e) {
+            log.error("Error marking questions as seen for user: {}", userId, e);
+            // Don't throw exception to avoid breaking interview completion
+        }
     }
 
     // Dashboard helpers

@@ -161,9 +161,20 @@ public class InterviewController {
     @GetMapping("/questions")
     public ResponseEntity<List<Question>> getQuestions(
             @RequestParam Question.Difficulty difficulty,
-            @RequestParam(defaultValue = "3") int count) {
+            @RequestParam(defaultValue = "3") int count,
+            Authentication authentication) {
         
-        List<Question> questions = interviewService.getRandomQuestions(difficulty, count);
+        String userId = null;
+        if (authentication != null) {
+            try {
+                SupabaseAuthService.SupabaseUser user = extractSupabaseUser(authentication);
+                userId = user.getId();
+            } catch (Exception e) {
+                log.warn("Could not extract user from authentication, using non-user-specific question selection", e);
+            }
+        }
+        
+        List<Question> questions = interviewService.getRandomQuestionsForUser(userId, difficulty, count);
         return ResponseEntity.ok(questions);
     }
 
