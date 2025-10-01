@@ -104,6 +104,9 @@ public class InterviewService {
 
         Interview savedInterview = interviewRepository.save(interview);
         
+        // Calculate and store overall rating for performance optimization
+        calculateAndStoreOverallRating(savedInterview);
+        
         // Mark questions as seen by the user
         markQuestionsAsSeen(interview.getUserId(), savedInterview);
         
@@ -126,6 +129,10 @@ public class InterviewService {
                             if (Boolean.FALSE.equals(iv.getAggregated())) {
                                 log.info("Updating dashboard aggregate for interview: {}", iv.getId());
                                 updateDashboardAggregate(iv);
+                                
+                                // Recalculate overall rating after feedback is generated
+                                calculateAndStoreOverallRating(iv);
+                                
                                 iv.setAggregated(true);
                                 interviewRepository.save(iv);
                             }
@@ -305,6 +312,49 @@ public class InterviewService {
     }
     
     /**
+     * Calculate and store overall rating in the interview for performance optimization
+     * This denormalizes the rating calculation to avoid complex joins in dashboard queries
+     */
+    public void calculateAndStoreOverallRating(Interview interview) {
+        log.info("Calculating overall rating for interview: {}", interview.getId());
+        
+        try {
+            List<UserSubmission> submissions = userSubmissionRepository.findByInterviewId(interview.getId());
+            
+            if (submissions.isEmpty()) {
+                log.info("No submissions found for interview: {}, setting rating to 0.0", interview.getId());
+                interview.setOverallRating(0.0);
+                interviewRepository.save(interview);
+                return;
+            }
+            
+            double[] ratings = submissions.stream()
+                    .map(UserSubmission::getClaudeFeedback)
+                    .filter(f -> f != null && !f.isBlank())
+                    .map(this::extractOverallRating)
+                    .filter(r -> r != null && r >= 0)
+                    .mapToDouble(Double::doubleValue)
+                    .toArray();
+            
+            double overallRating = ratings.length == 0 ? 0.0 : java.util.Arrays.stream(ratings).average().orElse(0.0);
+            
+            // Round to 1 decimal place
+            overallRating = Math.round(overallRating * 10.0) / 10.0;
+            
+            interview.setOverallRating(overallRating);
+            interviewRepository.save(interview);
+            
+            log.info("Stored overall rating {} for interview: {}", overallRating, interview.getId());
+            
+        } catch (Exception e) {
+            log.error("Error calculating overall rating for interview: {}", interview.getId(), e);
+            // Set default rating to avoid null values
+            interview.setOverallRating(0.0);
+            interviewRepository.save(interview);
+        }
+    }
+
+    /**
      * Mark questions as seen by a user when they complete an interview
      * Simplified approach to avoid connection leaks
      */
@@ -344,13 +394,33 @@ public class InterviewService {
     }
 
     public List<UserSubmission> getSubmissionsForUser(String userId) {
-        // naive approach: fetch interviews then submissions per interview
+        long startTime = System.currentTimeMillis();
+        log.info("🚀 getSubmissionsForUser started for user: {}", userId);
+        
+        // OPTIMIZATION: Two-query approach for better performance
+        // Step 1: Get interview IDs for the user
         List<Interview> interviews = getInterviewsForUser(userId);
-        java.util.List<UserSubmission> all = new java.util.ArrayList<>();
-        for (Interview i : interviews) {
-            all.addAll(userSubmissionRepository.findByInterviewId(i.getId()));
+        List<UUID> interviewIds = interviews.stream()
+                .map(Interview::getId)
+                .toList();
+        
+        log.info("📊 Found {} interviews for user: {}", interviews.size(), userId);
+        
+        if (interviewIds.isEmpty()) {
+            log.info("⏱️ getSubmissionsForUser completed in {}ms (no interviews)", System.currentTimeMillis() - startTime);
+            return new ArrayList<>();
         }
-        return all;
+        
+        // Step 2: Get all submissions for those interview IDs in one query
+        long queryStartTime = System.currentTimeMillis();
+        List<UserSubmission> submissions = userSubmissionRepository.findByInterviewIdIn(interviewIds);
+        long queryEndTime = System.currentTimeMillis();
+        
+        long totalTime = System.currentTimeMillis() - startTime;
+        log.info("📈 Fetched {} submissions in {}ms (query: {}ms, total: {}ms)", 
+                submissions.size(), (queryEndTime - queryStartTime), (queryEndTime - queryStartTime), totalTime);
+        
+        return submissions;
     }
 
     public Double extractOverallRating(String feedbackJson) {

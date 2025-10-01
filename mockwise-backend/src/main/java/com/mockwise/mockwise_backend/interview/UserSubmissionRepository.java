@@ -11,4 +11,7 @@ public interface UserSubmissionRepository extends JpaRepository<UserSubmission, 
     List<UserSubmission> findByInterviewId(UUID interviewId);
     
     List<UserSubmission> findByInterview_IdOrderBySubmittedAt(UUID interviewId);
+    
+    // OPTIMIZATION: Batch query for multiple interview IDs
+    List<UserSubmission> findByInterviewIdIn(List<UUID> interviewIds);
 }

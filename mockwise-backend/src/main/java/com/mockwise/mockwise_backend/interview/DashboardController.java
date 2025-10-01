@@ -9,6 +9,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import java.util.Map;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -38,7 +41,7 @@ public class DashboardController {
             long totalQuestions = agg != null ? agg.getTotalQuestions() : 0L;
             long avgTimePerQuestionSec = (totalQuestions == 0) ? 0 : (totalSeconds / totalQuestions);
 
-            java.util.Map<String, Double> scoreByDifficulty = new java.util.HashMap<>();
+            Map<String, Double> scoreByDifficulty = new HashMap<>();
             if (agg != null) {
                 double e = (agg.getCntEasy() == 0) ? 0.0 : Math.round((agg.getSumEasy() / agg.getCntEasy()) * 10.0) / 10.0;
                 double m = (agg.getCntMedium() == 0) ? 0.0 : Math.round((agg.getSumMedium() / agg.getCntMedium()) * 10.0) / 10.0;
@@ -49,8 +52,8 @@ public class DashboardController {
             }
 
             String lastMock = (agg != null && agg.getLastMockDate() != null)
-                    ? java.time.format.DateTimeFormatter.ofPattern("MMM d, yyyy")
-                        .withZone(java.time.ZoneId.systemDefault())
+                    ? DateTimeFormatter.ofPattern("MMM d, yyyy")
+                        .withZone(ZoneId.systemDefault())
                         .format(agg.getLastMockDate())
                     : "";
 
@@ -72,30 +75,22 @@ public class DashboardController {
 
     @GetMapping("/progress")
     public ResponseEntity<?> getProgress(Authentication authentication) {
+        long startTime = System.currentTimeMillis();
+        log.info("Dashboard progress API started for user: {}", authentication.getName());
+        
         try {
             SupabaseAuthService.SupabaseUser user = extractSupabaseUser(authentication);
             String userId = user.getId();
             List<Interview> interviews = interviewService.getInterviewsForUser(userId);
+            log.info("Found {} interviews for user: {}", interviews.size(), userId);
 
-            java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")
-                    .withZone(java.time.ZoneId.systemDefault());
+            DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+                    .withZone(ZoneId.systemDefault());
 
             List<Map<String, Object>> series = interviews.stream()
                     .map(iv -> {
-                        double overall = 0.0;
-                        try {
-                            List<UserSubmission> subs = interviewService.getSubmissionsForUser(userId).stream()
-                                    .filter(s -> s.getInterview().getId().equals(iv.getId()))
-                                    .toList();
-                            double[] ratings = subs.stream()
-                                    .map(UserSubmission::getClaudeFeedback)
-                                    .filter(f -> f != null && !f.isBlank())
-                                    .map(interviewService::extractOverallRating)
-                                    .filter(r -> r != null && r >= 0)
-                                    .mapToDouble(Double::doubleValue)
-                                    .toArray();
-                            overall = ratings.length == 0 ? 0.0 : java.util.Arrays.stream(ratings).average().orElse(0.0);
-                        } catch (Exception ignore) {}
+                        // OPTIMIZATION: Use denormalized rating field instead of calculating from submissions
+                        double overall = iv.getOverallRating() != null ? iv.getOverallRating() : 0.0;
 
                         long durationMin = 0L;
                         if (iv.getEndedAt() != null && iv.getStartedAt() != null) {
@@ -105,7 +100,7 @@ public class DashboardController {
                         java.util.Map<String, Object> m = new java.util.HashMap<>();
                         m.put("id", iv.getId());
                         m.put("date", iv.getStartedAt() != null ? fmt.format(iv.getStartedAt()) : "");
-                        m.put("overallRating", Math.round(overall * 10.0) / 10.0);
+                        m.put("overallRating", overall); // Already rounded in the entity
                         m.put("numQuestions", iv.getNumQuestions());
                         m.put("difficulty", iv.getDifficulty().name().substring(0,1) + iv.getDifficulty().name().substring(1).toLowerCase());
                         m.put("timeMinutes", iv.getTimeMinutes() != null ? iv.getTimeMinutes() : (int) durationMin);
@@ -113,9 +108,15 @@ public class DashboardController {
                     })
                     .collect(Collectors.toList());
 
+            long endTime = System.currentTimeMillis();
+            long totalTime = endTime - startTime;
+            log.info("sDashboard progress API completed in {}ms for user: {}", totalTime, userId);
+
             return ResponseEntity.ok(series);
         } catch (Exception e) {
-            log.error("Error building progress series", e);
+            long endTime = System.currentTimeMillis();
+            long totalTime = endTime - startTime;
+            log.error("❌ Dashboard progress API failed after {}ms: {}", totalTime, e.getMessage(), e);
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }

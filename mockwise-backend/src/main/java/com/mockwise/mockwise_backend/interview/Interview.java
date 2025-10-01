@@ -51,6 +51,9 @@ public class Interview {
     @Column(name = "aggregated")
     private Boolean aggregated = false;
     
+    @Column(name = "overall_rating")
+    private Double overallRating;
+    
     @OneToMany(mappedBy = "interview", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<UserSubmission> submissions;
     
