@@ -142,7 +142,7 @@ public class InterviewService {
 
     @Transactional
     private void performPostFeedbackProcessing(UUID interviewId) {
-        log.info("*****POST-FEEDBACK HOOKS STARTING for interview: {}******", interviewId);
+        log.info("Post-Feedback hooks starting for interview: {}", interviewId);
         try {
             Interview iv = interviewRepository.findById(interviewId).orElse(null);
             if (iv != null) {
