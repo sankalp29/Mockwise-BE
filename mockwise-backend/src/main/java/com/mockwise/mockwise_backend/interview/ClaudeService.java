@@ -126,7 +126,8 @@ public class ClaudeService {
             Time Complexity (0.05 weight) & Space Complexity (0.05 weight):  
             Compare user's self-assessed complexity with actual Big O of the code.
             Scoring:
-            - 10: Exactly correct (Minor notation differences (e.g., O(n) vs O(N)) acceptable)
+            - 10: Exactly correct (notation / standard format differences are acceptable)
+            - 7-9: Essentially correct (notation / standard format differences are acceptable)
             - 0: Incorrect or missing
 
             In feedback, always state:
@@ -142,7 +143,8 @@ public class ClaudeService {
             Improvements: actionable issues only (correctness > efficiency > clarity)
 
             Overall Rating (0–10):  
-            Weighted avg: Correctness (0.25), Optimality (0.60), Time (0.05), Space (0.05), Clarity (0.05)
+            Weighted avg: (correctness_score * 0.25) + (optimality_score * 0.60) + (timeComplexity_score * 0.05) + (spaceComplexity_score * 0.05) + (clarity_score * 0.05)
+            Round it down to nearest integer.
 
             Return ONLY this JSON:
 
