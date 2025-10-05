@@ -80,107 +80,84 @@ public class ClaudeService {
     // Helper: Generate prompt for code feedback evaluation (includes optional user self-assessment)
     public String buildCodeFeedbackPrompt(String problemStatement, String userCode, String language,
                                       String userTimeComplexity, String userSpaceComplexity) {
-    String selfTime = (userTimeComplexity == null || userTimeComplexity.isBlank()) ? "Not provided" : userTimeComplexity;
-    String selfSpace = (userSpaceComplexity == null || userSpaceComplexity.isBlank()) ? "Not provided" : userSpaceComplexity;
+        String selfTime = (userTimeComplexity == null || userTimeComplexity.isBlank()) ? "Not provided" : userTimeComplexity;
+        String selfSpace = (userSpaceComplexity == null || userSpaceComplexity.isBlank()) ? "Not provided" : userSpaceComplexity;
 
-    return String.format("""
-        Evaluate the following coding problem and solution for correctness, optimality, time complexity, space complexity, clarity, readability, and provide an overall feedback and rating out of 10.
+        return String.format("""
+            Evaluate this coding problem and solution for correctness, optimality, time & space complexity, clarity, and provide overall feedback + rating out of 10.
 
-        *Problem Statement:*
-        %s
+            **Problem**:  
+            %s
 
-        *User's Solution (%s):*
-        ⁠ %s
-        %s
-         ⁠
+            **User Code (%s)**:  
+            %s
 
-        *User's Self-Assessed Complexities (if any):*
-        - Time Complexity: %s
-        - Space Complexity: %s
+            **Self-Assessed Complexity**:  
+            Time: %s  
+            Space: %s
 
-        *Critical Evaluation Rules:*
-        Global Stub Rule (Overrides all other category rules):
-        If the code has no meaningful implementation (only stubs, empty methods, comments, or incomplete skeletons):
-        - Set ALL scores (correctness, optimality, timeComplexity, spaceComplexity, clarity) to 0.
-        - For every category’s feedback, overallFeedback, strengths, and improvements: "No meaningful implementation was provided, so no evaluation is possible."
-        - Do NOT infer any time/space complexities.
-        - This rule ALWAYS takes precedence over the category-specific scoring rubrics below.
+            ======== RULES ========
 
-        ### 1) Correctness (Highest Priority)
-        - Correctness is the foundation; if the solution is incorrect, all other scores (optimality, complexity) must also be 0.
-        - Must solve the problem for all valid inputs, including edge cases (empty input, min/max values, duplicates, boundary cases).
-        - Brute force but correct → high correctness score, lower optimality score.
-        - If incorrect, explain why and deduct points.
+            Stub Rule (Overrides All):  
+            If code is stub/empty/unimplemented:
+            - All scores = 0  
+            - All feedback = "No meaningful implementation provided."  
+            - Do not infer complexity.  
 
-        *Score Range*
-        - 9–10: Fully correct, handles all edge cases.
-        - 7–8: Mostly correct, minor edge case issues.
-        - 5–6: Partially correct, misses multiple cases.
-        - ≤4: Incorrect or fails most cases.
+            Correctness (25%% weight):  
+            - Must work for all valid + edge inputs.  
+            - Brute-force but correct is acceptable.  
+            - Incorrect = all other scores 0.  
+            Scoring:  
+            - 8–10: Fully correct  
+            - 6–7: Minor edge issues  
+            - 4–5: Partially correct  
+            - ≤3: Fails most cases  
 
-        ### 2) Optimality (Only if Correctness > 0)
-        - Evaluate if the solution is optimal in both time and space.
-        - Correct but suboptimal (e.g., O(N²) instead of O(N)) → reduced score.
-        - Prioritize time optimality over space.
-        - Correct but brute-force is fine → correctness high, optimality low.
+            Optimality (60%%):  
+            Only if correct.  
+            - Brute force = low score.  
+            Scoring:  
+            - 8–10: Fully optimal  
+            - 6–7: Efficient, not best  
+            - 4–5: Clearly inefficient  
+            - ≤3: Very poor  
 
-        *Score Range*
-        - 9–10: Fully optimal in time & space.
-        - 7–8: Efficient but not the best.
-        - 5–6: Works but clearly inefficient.
-        - ≤4: Inefficient or irrelevant if correctness is 0.
+            Time Complexity (5%%) & Space Complexity (5%%):  
+            Compare user's self-assessed complexity with actual Big O of the code.
+            Scoring:
+            - 10: Exactly correct (Minor notation differences (e.g., O(n) vs O(N)) acceptable)
+            - 0: Incorrect or missing
 
-        ### 3) Time & Space Complexity (Only if Correctness > 0)
-        - Derive from code only, not from user claims.
-        - Compare against user’s self-assessment:
-            - Correct → full marks.
-            - Incorrect or missing → deduct 2 marks.
-        - If inefficient but correct → highlight explicitly.
+            In feedback, always state:
+            - Actual Big O: ...
+            - User stated: ...
+            - Match: Yes/No (with explanation if incorrect)  
 
-        *Score Range*
-        - 9–10: Correct, optimal complexity.
-        - 7–8: Correct but slightly inefficient.
-        - 5–6: Works but inefficient or missing/incorrect assessment.
-        - ≤4: Incorrect solution or very poor efficiency.
+            Code Clarity (5%%):  
+            - Score based on naming, structure, readability, modularity.  
+            - No penalty for missing comments.  
 
-        ### 4) Code Clarity & Readability (Only if Correctness > 0)
-        - Focus on structure, naming, and maintainability.
-        - Do NOT penalize for missing comments (not required in interviews).
-        - Deduct only if code is confusing, repetitive, or poorly structured.
+            Strengths: real positives only  
+            Improvements: actionable issues only (correctness > efficiency > clarity)
 
-        *Score Range*
-        - 9–10: Highly readable and modular.
-        - 7–8: Readable with minor improvements.
-        - 5–6: Moderate clarity, some confusing parts.
-        - ≤4: Poor readability and unmaintainable.
+            Overall Rating (0–10):  
+            Weighted avg: Correctness (40), Optimality (40), Time (10), Space (5), Clarity (5)
 
-        ### 5) Strengths
-        - Highlight specific positives (correctness, edge case handling, efficient logic, modularity, readability).
-        - Avoid trivial points.
+            Return ONLY this JSON:
 
-        ### 6) Areas for Improvement
-        - Identify real growth opportunities (correctness first → optimality → efficiency → clarity).
-        - No mention of missing comments.
-
-        ### 7) Overall Feedback
-        - Provide a balanced, specific summary covering correctness, optimality, efficiency, and clarity.
-        - Overall rating should combine all categories.
-
-        *Output Format:*
-        Return ONLY this JSON object, no other text:
-
-        {
-            "correctness": {"score": 0-10, "feedback": "detailed feedback on correctness"},
-            "optimality": {"score": 0-10, "feedback": "detailed feedback on optimality"},
-            "timeComplexity": {"score": 0-10, "feedback": "analysis of time complexity", "bigO": "O(n), O(log n), etc."},
-            "spaceComplexity": {"score": 0-10, "feedback": "analysis of space complexity", "bigO": "O(1), O(n), etc."},
-            "clarity": {"score": 0-10, "feedback": "feedback on code clarity"},
+            {
+            "correctness": {"score": 0-10, "feedback": "..."},
+            "optimality": {"score": 0-10, "feedback": "..."},
+            "timeComplexity": {"score": 0-10, "feedback": "...", "bigO": "..."},
+            "spaceComplexity": {"score": 0-10, "feedback": "...", "bigO": "..."},
+            "clarity": {"score": 0-10, "feedback": "..."},
             "overallRating": 0-10,
-            "overallFeedback": "comprehensive overall feedback",
-            "strengths": ["strength1", "strength2"],
-            "improvements": ["improvement1", "improvement2"]
-        }
-        """, problemStatement, language, language, userCode, selfTime, selfSpace);
+            "overallFeedback": "...",
+            "strengths": ["..."],
+            "improvements": ["..."]
+            }
+            """, problemStatement, language, userCode, selfTime, selfSpace);
     }
 
     
