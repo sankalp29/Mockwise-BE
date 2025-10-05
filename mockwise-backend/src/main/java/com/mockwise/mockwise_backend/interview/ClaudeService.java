@@ -114,7 +114,7 @@ public class ClaudeService {
             - 4–5: Partially correct  
             - ≤3: Fails most cases  
 
-            Optimality (60%%):  
+            Optimality (60%% weight):  
             Only if correct.  
             - Brute force = low score.  
             Scoring:  
@@ -123,7 +123,7 @@ public class ClaudeService {
             - 4–5: Clearly inefficient  
             - ≤3: Very poor  
 
-            Time Complexity (5%%) & Space Complexity (5%%):  
+            Time Complexity (5%% weight) & Space Complexity (5%% weight):  
             Compare user's self-assessed complexity with actual Big O of the code.
             Scoring:
             - 10: Exactly correct (Minor notation differences (e.g., O(n) vs O(N)) acceptable)
@@ -134,7 +134,7 @@ public class ClaudeService {
             - User stated: ...
             - Match: Yes/No (with explanation if incorrect)  
 
-            Code Clarity (5%%):  
+            Code Clarity (5%% weight):  
             - Score based on naming, structure, readability, modularity.  
             - No penalty for missing comments.  
 
@@ -142,7 +142,7 @@ public class ClaudeService {
             Improvements: actionable issues only (correctness > efficiency > clarity)
 
             Overall Rating (0–10):  
-            Weighted avg: Correctness (40), Optimality (40), Time (10), Space (5), Clarity (5)
+            Weighted avg: Correctness (25%), Optimality (60%), Time (5%), Space (5), Clarity (5)
 
             Return ONLY this JSON:
 
