@@ -11,7 +11,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -88,9 +87,22 @@ public class InterviewService {
 
         // Batch save all submissions for better performance and connection management
         List<UserSubmission> submissionsToSave = new ArrayList<>();
+        // Collect all question IDs first
+        List<UUID> questionIds = submissions.stream()
+                .map(SubmissionRequest::getQuestionId)
+                .toList();
+        // Fetch all questions in one query and index by ID
+        List<Question> questions = questionRepository.findAllById(questionIds);
+        java.util.Map<UUID, Question> questionById = new java.util.HashMap<>();
+        for (Question q : questions) {
+            questionById.put(q.getId(), q);
+        }
+        // Build submissions using the pre-fetched questions
         for (SubmissionRequest submissionReq : submissions) {
-            Question question = questionRepository.findById(submissionReq.getQuestionId())
-                    .orElseThrow(() -> new IllegalArgumentException("Question not found"));
+            Question question = questionById.get(submissionReq.getQuestionId());
+            if (question == null) {
+                throw new IllegalArgumentException("Question not found: " + submissionReq.getQuestionId());
+            }
 
             UserSubmission submission = new UserSubmission();
             submission.setInterview(interview);
@@ -117,31 +129,22 @@ public class InterviewService {
 
         // Get submissions in a separate transaction to avoid holding connection during API calls
         return Mono.fromCallable(() -> {
-                return userSubmissionRepository.findByInterviewId(interviewId);
-                    })
-                    .flatMap(submissions -> {
-                        log.info("Found {} submissions for interview: {}", submissions.size(), interviewId);
-                        
-                        // Process feedback generation without holding DB connections
-                        return Flux.fromIterable(submissions)
-                                .flatMap(this::generateFeedbackForSubmission)
-                                .then(Mono.fromRunnable(() -> {
-                                    // Post-processing in separate transaction
-                                    performPostFeedbackProcessing(interviewId);
-                                }));
-                    })
-                    .doOnSuccess(v -> log.info("Successfully generated feedback for all submissions in interview: {}", interviewId))
-                    .doOnError(e -> log.error("Error generating feedback for interview: {}", interviewId, e))
-                    .then();
-        // return Mono.fromCallable(() -> userSubmissionRepository.findByInterviewId(interviewId))
-        //         .subscribeOn(Schedulers.boundedElastic())
-        //         .flatMapMany(Flux::fromIterable)
-        //         .concatMap(this::generateFeedbackForSubmission)
-        //         .then(Mono.fromRunnable(() -> performPostFeedbackProcessing(interviewId))
-        //                 .subscribeOn(Schedulers.boundedElastic()))
-        //         .doOnSuccess(v -> log.info("Successfully generated feedback for all submissions in interview: {}", interviewId))
-        //         .doOnError(e -> log.error("Error generating feedback for interview: {}", interviewId, e))
-        //         .then();
+            return userSubmissionRepository.findByInterviewId(interviewId);
+                })
+                .flatMap(submissions -> {
+                    log.info("Found {} submissions for interview: {}", submissions.size(), interviewId);
+                    
+                    // Process feedback generation without holding DB connections
+                    return Flux.fromIterable(submissions)
+                            .flatMap(this::generateFeedbackForSubmission)
+                            .then(Mono.fromRunnable(() -> {
+                                // Post-processing in separate transaction
+                                performPostFeedbackProcessing(interviewId);
+                            }));
+                })
+                .doOnSuccess(v -> log.info("Successfully generated feedback for all submissions in interview: {}", interviewId))
+                .doOnError(e -> log.error("Error generating feedback for interview: {}", interviewId, e))
+                .then();
     }
 
     @Transactional
