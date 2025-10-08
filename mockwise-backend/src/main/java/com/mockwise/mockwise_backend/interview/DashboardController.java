@@ -110,7 +110,7 @@ public class DashboardController {
 
             long endTime = System.currentTimeMillis();
             long totalTime = endTime - startTime;
-            log.info("sDashboard progress API completed in {}ms for user: {}", totalTime, userId);
+            log.info("Dashboard progress API completed in {}ms for user: {}", totalTime, userId);
 
             return ResponseEntity.ok(series);
         } catch (Exception e) {

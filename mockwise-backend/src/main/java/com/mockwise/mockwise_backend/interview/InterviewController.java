@@ -87,8 +87,8 @@ public class InterviewController {
             // End the interview and save submissions
             Interview interview = interviewService.endInterview(interviewId, request.getSubmissions());
             log.info("Interview ended successfully: {}", interview.getId());
-            log.info("Interview ended: {}", interview);
 
+            interviewService.markQuestionsAsSeen(interview.getUserId(), interview);
 
             // Generate feedback asynchronously (fire-and-forget)
             log.info("*****STARTING FEEDBACK GENERATION******");
@@ -102,7 +102,7 @@ public class InterviewController {
                 "interviewId", interview.getId().toString()
             );
             return Mono.just(ResponseEntity.ok(response));
-                    
+
         } catch (Exception e) {
             log.error("Error submitting interview", e);
             return Mono.just(ResponseEntity.badRequest().body(Map.of("error", (Object) e.getMessage())));

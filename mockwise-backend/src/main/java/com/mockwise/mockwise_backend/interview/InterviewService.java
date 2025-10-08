@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -108,12 +109,6 @@ public class InterviewService {
 
         Interview savedInterview = interviewRepository.save(interview);
         
-        // Calculate and store overall rating for performance optimization
-        calculateAndStoreOverallRating(savedInterview);
-        
-        // Mark questions as seen by the user
-        markQuestionsAsSeen(interview.getUserId(), savedInterview);
-        
         return savedInterview;
     }
 
@@ -122,22 +117,31 @@ public class InterviewService {
 
         // Get submissions in a separate transaction to avoid holding connection during API calls
         return Mono.fromCallable(() -> {
-            return userSubmissionRepository.findByInterviewId(interviewId);
-        })
-        .flatMap(submissions -> {
-            log.info("Found {} submissions for interview: {}", submissions.size(), interviewId);
-            
-            // Process feedback generation without holding DB connections
-            return Flux.fromIterable(submissions)
-                    .flatMap(this::generateFeedbackForSubmission)
-                    .then(Mono.fromRunnable(() -> {
-                        // Post-processing in separate transaction
-                        performPostFeedbackProcessing(interviewId);
-                    }));
-        })
-        .doOnSuccess(v -> log.info("Successfully generated feedback for all submissions in interview: {}", interviewId))
-        .doOnError(e -> log.error("Error generating feedback for interview: {}", interviewId, e))
-        .then();
+                return userSubmissionRepository.findByInterviewId(interviewId);
+                    })
+                    .flatMap(submissions -> {
+                        log.info("Found {} submissions for interview: {}", submissions.size(), interviewId);
+                        
+                        // Process feedback generation without holding DB connections
+                        return Flux.fromIterable(submissions)
+                                .flatMap(this::generateFeedbackForSubmission)
+                                .then(Mono.fromRunnable(() -> {
+                                    // Post-processing in separate transaction
+                                    performPostFeedbackProcessing(interviewId);
+                                }));
+                    })
+                    .doOnSuccess(v -> log.info("Successfully generated feedback for all submissions in interview: {}", interviewId))
+                    .doOnError(e -> log.error("Error generating feedback for interview: {}", interviewId, e))
+                    .then();
+        // return Mono.fromCallable(() -> userSubmissionRepository.findByInterviewId(interviewId))
+        //         .subscribeOn(Schedulers.boundedElastic())
+        //         .flatMapMany(Flux::fromIterable)
+        //         .concatMap(this::generateFeedbackForSubmission)
+        //         .then(Mono.fromRunnable(() -> performPostFeedbackProcessing(interviewId))
+        //                 .subscribeOn(Schedulers.boundedElastic()))
+        //         .doOnSuccess(v -> log.info("Successfully generated feedback for all submissions in interview: {}", interviewId))
+        //         .doOnError(e -> log.error("Error generating feedback for interview: {}", interviewId, e))
+        //         .then();
     }
 
     @Transactional
@@ -150,9 +154,6 @@ public class InterviewService {
                 if (Boolean.FALSE.equals(iv.getAggregated())) {
                     log.info("Updating dashboard aggregate for interview: {}", iv.getId());
                     updateDashboardAggregate(iv);
-                    
-                    // Recalculate overall rating after feedback is generated
-                    calculateAndStoreOverallRating(iv);
                     
                     iv.setAggregated(true);
                     interviewRepository.save(iv);
@@ -190,6 +191,11 @@ public class InterviewService {
                 .mapToDouble(Double::doubleValue)
                 .toArray();
         double overall = ratings.length == 0 ? 0.0 : java.util.Arrays.stream(ratings).average().orElse(0.0);
+
+        // Persist rounded interview-level rating for UI/reporting
+        double roundedOverall = Math.round(overall * 10.0) / 10.0;
+        interview.setOverallRating(roundedOverall);
+        interviewRepository.save(interview);
 
         agg.setTotalMocks(agg.getTotalMocks() + 1);
         agg.setTotalTimeSpentSeconds(agg.getTotalTimeSpentSeconds() + seconds);
@@ -231,16 +237,17 @@ public class InterviewService {
                 .flatMap(feedback -> {
                     log.info("Feedback for submission: {}", feedback);
                     // Save in separate transaction to avoid connection leaks
-                    return saveFeedbackInTransaction(submission, feedback);
+                    return saveFeedback(submission, feedback);
                 })
                 .doOnError(e -> log.error("Error generating feedback for submission: {}", submission.getId(), e));
     }
 
-    @Transactional
-    private Mono<UserSubmission> saveFeedbackInTransaction(UserSubmission submission, String feedback) {
+    private Mono<UserSubmission> saveFeedback(UserSubmission submission, String feedback) {
         submission.setClaudeFeedback(feedback);
         submission.setFeedbackGeneratedAt(Instant.now());
         return Mono.just(userSubmissionRepository.save(submission));
+        // return Mono.fromCallable(() -> userSubmissionRepository.save(submission))
+        //        .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic());
     }
 
     private String formatProblemStatement(Question question) {
@@ -336,78 +343,45 @@ public class InterviewService {
         
         return questions;
     }
-    
-    /**
-     * Calculate and store overall rating in the interview for performance optimization
-     * This denormalizes the rating calculation to avoid complex joins in dashboard queries
-     */
-    @Transactional
-    public void calculateAndStoreOverallRating(Interview interview) {
-        log.info("Calculating overall rating for interview: {}", interview.getId());
-        
-        try {
-            List<UserSubmission> submissions = userSubmissionRepository.findByInterviewId(interview.getId());
-            
-            if (submissions.isEmpty()) {
-                log.info("No submissions found for interview: {}, setting rating to 0.0", interview.getId());
-                interview.setOverallRating(0.0);
-                interviewRepository.save(interview);
-                return;
-            }
-            
-            double[] ratings = submissions.stream()
-                    .map(UserSubmission::getClaudeFeedback)
-                    .filter(f -> f != null && !f.isBlank())
-                    .map(this::extractOverallRating)
-                    .filter(r -> r != null && r >= 0)
-                    .mapToDouble(Double::doubleValue)
-                    .toArray();
-            
-            double overallRating = ratings.length == 0 ? 0.0 : java.util.Arrays.stream(ratings).average().orElse(0.0);
-            
-            // Round to 1 decimal place
-            overallRating = Math.round(overallRating * 10.0) / 10.0;
-            
-            interview.setOverallRating(overallRating);
-            interviewRepository.save(interview);
-            
-            log.info("Stored overall rating {} for interview: {}", overallRating, interview.getId());
-            
-        } catch (Exception e) {
-            log.error("Error calculating overall rating for interview: {}", interview.getId(), e);
-            // Set default rating to avoid null values
-            interview.setOverallRating(0.0);
-            interviewRepository.save(interview);
-        }
-    }
 
     /**
      * Mark questions as seen by a user when they complete an interview
      * Simplified approach to avoid connection leaks
      */
+    @Transactional
     public void markQuestionsAsSeen(String userId, Interview interview) {
         log.info("Marking questions as seen for user: {} in interview: {}", userId, interview.getId());
         
         try {
             Question.Difficulty difficulty = interview.getDifficulty();
             
-            // Simple approach: mark each question individually with error handling
-            for (InterviewQuestion link : interview.getAssignedQuestionLinks()) {
-                UUID questionId = link.getQuestion().getId();
-                
-                try {
-                    // Check if already exists to avoid duplicates
-                    if (!userQuestionSeenRepository.existsByUserIdAndQuestionId(userId, questionId)) {
-                        UserQuestionSeen seen = new UserQuestionSeen(userId, questionId, difficulty);
-                        userQuestionSeenRepository.save(seen);
-                    }
-                } catch (Exception e) {
-                    log.warn("Failed to mark question {} as seen for user {}: {}", questionId, userId, e.getMessage());
-                    // Continue with other questions
-                }
+            // Collect assigned question IDs
+            List<UUID> assignedQuestionIds = interview.getAssignedQuestionLinks().stream()
+                    .map(link -> link.getQuestion().getId())
+                    .toList();
+
+            if (assignedQuestionIds.isEmpty()) {
+                log.info("No assigned questions found to mark as seen for user: {}", userId);
+                return;
             }
-            
-            log.info("Completed marking questions as seen for user: {}", userId);
+
+            // Single IN query to find which are already seen by this user
+            List<UUID> existingSeen = userQuestionSeenRepository
+                    .findSeenQuestionIdsByUserAndQuestionIds(userId, assignedQuestionIds);
+            java.util.Set<UUID> existingSeenSet = new java.util.HashSet<>(existingSeen);
+
+            // Create only the missing rows
+            List<UserQuestionSeen> toInsert = assignedQuestionIds.stream()
+                    .filter(qid -> !existingSeenSet.contains(qid))
+                    .map(qid -> new UserQuestionSeen(userId, qid, difficulty))
+                    .toList();
+
+            if (!toInsert.isEmpty()) {
+                userQuestionSeenRepository.saveAll(toInsert);
+                log.info("Inserted {} new seen records for user: {}", toInsert.size(), userId);
+            } else {
+                log.info("All {} assigned questions are already marked seen for user: {}", assignedQuestionIds.size(), userId);
+            }
             
         } catch (Exception e) {
             log.error("Error marking questions as seen for user: {}", userId, e);
@@ -457,8 +431,6 @@ public class InterviewService {
         } catch (Exception ignore) {}
         return null;
     }
-
-
 
     public Interview getInterviewWithFeedback(UUID interviewId) {
         return interviewRepository.findById(interviewId)
