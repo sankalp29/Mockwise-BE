@@ -125,8 +125,9 @@ public class ClaudeService {
 
             Time Complexity (0.10 weight) & Space Complexity (0.10 weight):  
             Compare user's self-assessed complexity with actual Big O of the code.
+            Do not penalize based on algorithm efficiency or optimality.
             Scoring:
-            - 10: Exactly correct (notation / standard format differences are acceptable)
+            - 10: Correct (notation / standard format differences are acceptable)
             - 7-9: Essentially correct (notation / standard format differences are acceptable)
             - 0: Incorrect or missing
 
@@ -144,7 +145,7 @@ public class ClaudeService {
 
             Overall Rating (0–10):  
             Weighted avg: (optimality_score * 0.75) + (timeComplexity_score * 0.10) + (spaceComplexity_score * 0.10) + (clarity_score * 0.05)
-            Round it down to nearest integer.
+            Round it to nearest integer.
 
             Return ONLY this JSON:
 
