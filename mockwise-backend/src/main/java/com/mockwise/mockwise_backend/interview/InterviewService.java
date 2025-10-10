@@ -14,6 +14,7 @@ import reactor.core.publisher.Mono;
 
 import java.io.File;
 import java.io.FileWriter;
+import java.io.IOException;
 import java.io.StringWriter;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -21,6 +22,10 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
 import javax.tools.Diagnostic;
 import javax.tools.DiagnosticCollector;
 import javax.tools.JavaCompiler;
@@ -607,33 +612,116 @@ public class InterviewService {
         return outputLines;
     }
 
+    // private List<String> checkPythonSyntax(String code, File tempDir) throws Exception {
+    //     File sourceFile = new File(tempDir, "solution.py");
+    //     try (FileWriter writer = new FileWriter(sourceFile)) {
+    //         writer.write(code);
+    //     }
+    //     // Use python -m py_compile to check syntax
+    //     List<String> command = Arrays.asList("python", "-m", "py_compile", sourceFile.getName());
+    //     List<String> output = executeCommand(command, tempDir, sourceFile.getName());
+    //     if (output.isEmpty()) {
+    //         return List.of(); // No errors
+    //     } else {
+    //         // Filter out non-error output like "Syntax producing bytecode: ..."
+    //         return output.stream()
+    //                      .filter(line -> line.contains("Error") || line.contains("SyntaxError"))
+    //                      .collect(java.util.ArrayList::new, java.util.ArrayList::add, java.util.ArrayList::addAll);
+    //     }
+    // }
+
     private List<String> checkPythonSyntax(String code, File tempDir) throws Exception {
         File sourceFile = new File(tempDir, "solution.py");
         try (FileWriter writer = new FileWriter(sourceFile)) {
             writer.write(code);
         }
-        // Use python -m py_compile to check syntax
-        List<String> command = Arrays.asList("python", "-m", "py_compile", sourceFile.getName());
-        List<String> output = executeCommand(command, tempDir, sourceFile.getName());
-        if (output.isEmpty()) {
-            return List.of(); // No errors
-        } else {
-            // Filter out non-error output like "Syntax producing bytecode: ..."
-            return output.stream()
-                         .filter(line -> line.contains("Error") || line.contains("SyntaxError"))
-                         .collect(java.util.ArrayList::new, java.util.ArrayList::add, java.util.ArrayList::addAll);
+        
+        // Try different Python commands (python3, python, py)
+        List<String> pythonCommands = Arrays.asList("python3", "python", "py");
+        
+        for (String pythonCmd : pythonCommands) {
+            try {
+                List<String> command = Arrays.asList(pythonCmd, "-m", "py_compile", sourceFile.getName());
+                List<String> output = executeCommand(command, tempDir, sourceFile.getName());
+                
+                if (output.isEmpty()) {
+                    return List.of(); // No errors
+                } else {
+                    // Filter and return only actual errors
+                    return output.stream()
+                                 .filter(line -> line.contains("SyntaxError") || 
+                                               line.contains("IndentationError") ||
+                                               line.contains("Error") ||
+                                               line.contains("line"))
+                                 .map(line -> line.replace(tempDir.getAbsolutePath() + File.separator, ""))
+                                 .collect(Collectors.toList());
+                }
+            } catch (IOException e) {
+                // Try next Python command
+                continue;
+            }
         }
+        
+        // If all Python commands failed
+        throw new Exception("Python interpreter not found. Please ensure Python 3 is installed.");
     }
 
     private List<String> checkCppSyntax(String code, File tempDir) throws Exception {
+        String processedCode = code;
+        boolean usedBitsHeader = false;
+        
+        // Ultra-permissive pattern that handles edge cases
+        // Matches variations with any whitespace, quotes, etc.
+        Pattern bitsPattern = Pattern.compile(
+            "#\\s*include\\s*[<\"]\\s*bits\\s*/\\s*stdc\\s*\\+\\+\\s*\\.\\s*h\\s*[>\"]",
+            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE
+        );
+        
+        Matcher matcher = bitsPattern.matcher(code);
+        
+        if (matcher.find()) {
+            usedBitsHeader = true;
+            log.info("User code uses bits/stdc++.h, replacing with standard headers");
+            
+            String standardHeaders = 
+                "#include <iostream>\n" +
+                "#include <vector>\n" +
+                "#include <string>\n" +
+                "#include <algorithm>\n" +
+                "#include <map>\n" +
+                "#include <set>\n" +
+                "#include <unordered_map>\n" +
+                "#include <unordered_set>\n" +
+                "#include <queue>\n" +
+                "#include <stack>\n" +
+                "#include <deque>\n" +
+                "#include <climits>\n" +
+                "#include <cmath>\n" +
+                "#include <numeric>\n" +
+                "#include <utility>\n" +
+                "#include <functional>\n";
+            
+            // Replace all variations
+            processedCode = matcher.replaceAll(standardHeaders);
+        }
+        
         File sourceFile = new File(tempDir, "solution.cpp");
         try (FileWriter writer = new FileWriter(sourceFile)) {
-            writer.write(code);
+            writer.write(processedCode);
         }
-        // Use g++ -fsyntax-only to check syntax
-        List<String> command = Arrays.asList("g++", "-fsyntax-only", sourceFile.getName());
+        
+        List<String> command = Arrays.asList(
+            "g++", 
+            "-std=c++17",
+            "-fsyntax-only",
+            sourceFile.getName()
+        );
+        
         List<String> output = executeCommand(command, tempDir, sourceFile.getName());
-        return output; // g++ only outputs errors to stderr, which is redirected to output
+        
+        return output.stream()
+                     .filter(line -> !line.trim().isEmpty())
+                     .collect(Collectors.toList());
     }
 
     public Interview findOngoingInterviewByUserId(String userId) {
