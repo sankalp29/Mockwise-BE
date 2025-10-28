@@ -136,6 +136,7 @@ public class InterviewService {
         return Mono.fromCallable(() -> {
             return userSubmissionRepository.findByInterviewId(interviewId);
                 })
+                .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic()) // CRITICAL: Offload blocking DB call
                 .flatMap(submissions -> {
                     log.info("Found {} submissions for interview: {}", submissions.size(), interviewId);
                     
@@ -145,7 +146,7 @@ public class InterviewService {
                             .then(Mono.fromRunnable(() -> {
                                 // Post-processing in separate transaction
                                 performPostFeedbackProcessing(interviewId);
-                            }));
+                            }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())); // CRITICAL: Offload blocking DB operations
                 })
                 .doOnSuccess(v -> log.info("Successfully generated feedback for all submissions in interview: {}", interviewId))
                 .doOnError(e -> log.error("Error generating feedback for interview: {}", interviewId, e))
@@ -253,9 +254,9 @@ public class InterviewService {
     private Mono<UserSubmission> saveFeedback(UserSubmission submission, String feedback) {
         submission.setClaudeFeedback(feedback);
         submission.setFeedbackGeneratedAt(Instant.now());
-        return Mono.just(userSubmissionRepository.save(submission));
-        // return Mono.fromCallable(() -> userSubmissionRepository.save(submission))
-        //        .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic());
+        // CRITICAL: Must use fromCallable + subscribeOn to offload blocking DB save
+        return Mono.fromCallable(() -> userSubmissionRepository.save(submission))
+                .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic());
     }
 
     private String formatProblemStatement(Question question) {

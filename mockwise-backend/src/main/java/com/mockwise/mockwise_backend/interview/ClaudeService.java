@@ -74,7 +74,7 @@ public class ClaudeService {
                 log.error("Error calling Anthropic SDK: {} - {}", e.getClass().getSimpleName(), String.valueOf(e.getMessage()));
                 return createFallbackResponse("Claude API call failed: " + e.getMessage());
             }
-        });
+        }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic()); // CRITICAL: Offload blocking HTTP call
     }
 
     // Helper: Generate prompt for code feedback evaluation (includes optional user self-assessment)
