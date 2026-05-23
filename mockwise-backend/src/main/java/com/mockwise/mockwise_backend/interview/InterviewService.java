@@ -7,10 +7,9 @@ import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -129,53 +128,46 @@ public class InterviewService {
         return savedInterview;
     }
 
-    public Mono<Void> generateFeedbackForInterview(UUID interviewId) {
+    @Async
+    public void generateFeedbackForInterview(UUID interviewId) {
         log.info("Generating Claude feedback for interview: {}", interviewId);
+        try {
+            List<UserSubmission> submissions = userSubmissionRepository.findByInterviewIdWithQuestion(interviewId);
+            log.info("Found {} submissions for interview: {}", submissions.size(), interviewId);
 
-        // Get submissions in a separate transaction to avoid holding connection during API calls
-        return Mono.fromCallable(() -> {
-            return userSubmissionRepository.findByInterviewId(interviewId);
-                })
-                .flatMap(submissions -> {
-                    log.info("Found {} submissions for interview: {}", submissions.size(), interviewId);
-                    
-                    // Process feedback generation without holding DB connections
-                    return Flux.fromIterable(submissions)
-                            .flatMap(this::generateFeedbackForSubmission)
-                            .then(Mono.fromRunnable(() -> {
-                                // Post-processing in separate transaction
-                                performPostFeedbackProcessing(interviewId);
-                            }));
-                })
-                .doOnSuccess(v -> log.info("Successfully generated feedback for all submissions in interview: {}", interviewId))
-                .doOnError(e -> log.error("Error generating feedback for interview: {}", interviewId, e))
-                .then();
+            for (UserSubmission submission : submissions) {
+                generateFeedbackForSubmission(submission);
+            }
+
+            performPostFeedbackProcessing(interviewId);
+            log.info("Successfully generated feedback for all submissions in interview: {}", interviewId);
+        } catch (Exception e) {
+            log.error("Error generating feedback for interview: {}", interviewId, e);
+        }
     }
 
     @Transactional
-    private void performPostFeedbackProcessing(UUID interviewId) {
+    public void performPostFeedbackProcessing(UUID interviewId) {
         log.info("Post-Feedback hooks starting for interview: {}", interviewId);
         try {
             Interview iv = interviewRepository.findById(interviewId).orElse(null);
-            if (iv != null) {
-                log.info("Found interview for post-processing: {}, aggregated: {}", iv.getId(), iv.getAggregated());
-                if (Boolean.FALSE.equals(iv.getAggregated())) {
-                    log.info("Updating dashboard aggregate for interview: {}", iv.getId());
-                    updateDashboardAggregate(iv);
-                    
-                    iv.setAggregated(true);
-                    interviewRepository.save(iv);
-                }
-                log.info("Post-feedback processing completed for interview: {}", iv.getId());
-            } else {
+            if (iv == null) {
                 log.warn("Interview not found for post-processing: {}", interviewId);
+                return;
             }
+            log.info("Found interview for post-processing: {}, aggregated: {}", iv.getId(), iv.getAggregated());
+            if (Boolean.FALSE.equals(iv.getAggregated())) {
+                log.info("Updating dashboard aggregate for interview: {}", iv.getId());
+                updateDashboardAggregate(iv);
+                iv.setAggregated(true);
+                interviewRepository.save(iv);
+            }
+            log.info("Post-feedback processing completed for interview: {}", iv.getId());
         } catch (Exception e) {
             log.error("Post-feedback hooks failed: {}", e.getMessage(), e);
         }
     }
 
-    @Transactional
     private void updateDashboardAggregate(Interview interview) {
         String userId = interview.getUserId();
         DashboardAggregate agg = dashboardAggregateRepository.findByUserId(userId).orElseGet(() -> {
@@ -200,7 +192,6 @@ public class InterviewService {
                 .toArray();
         double overall = ratings.length == 0 ? 0.0 : java.util.Arrays.stream(ratings).average().orElse(0.0);
 
-        // Persist rounded interview-level rating for UI/reporting
         double roundedOverall = Math.round(overall * 10.0) / 10.0;
         interview.setOverallRating(roundedOverall);
         interviewRepository.save(interview);
@@ -226,12 +217,11 @@ public class InterviewService {
         dashboardAggregateRepository.save(agg);
     }
 
-    private Mono<UserSubmission> generateFeedbackForSubmission(UserSubmission submission) {
-        log.info("*****GENERATING FEEDBACK FOR SUBMISSION: {}******", submission.getId());
+    private void generateFeedbackForSubmission(UserSubmission submission) {
+        log.info("Generating feedback for submission: {}", submission.getId());
         Question question = submission.getQuestion();
         String problemStatement = formatProblemStatement(question);
-        
-        // Generate prompt for code feedback and call Claude
+
         String prompt = claudeService.buildCodeFeedbackPrompt(
             problemStatement,
             submission.getCode(),
@@ -239,23 +229,13 @@ public class InterviewService {
             submission.getUserTimeComplexity(),
             submission.getUserSpaceComplexity());
         log.info("Calling Claude API for submission: {}", submission.getId());
-        
-        // Separate API call from database operation to avoid holding connection during API call
-        return claudeService.callClaude(prompt)
-                .flatMap(feedback -> {
-                    log.info("Feedback for submission: {}", feedback);
-                    // Save in separate transaction to avoid connection leaks
-                    return saveFeedback(submission, feedback);
-                })
-                .doOnError(e -> log.error("Error generating feedback for submission: {}", submission.getId(), e));
-    }
 
-    private Mono<UserSubmission> saveFeedback(UserSubmission submission, String feedback) {
+        String feedback = claudeService.callClaude(prompt);
+        log.info("Received feedback for submission: {}", submission.getId());
+
         submission.setClaudeFeedback(feedback);
         submission.setFeedbackGeneratedAt(Instant.now());
-        return Mono.just(userSubmissionRepository.save(submission));
-        // return Mono.fromCallable(() -> userSubmissionRepository.save(submission))
-        //        .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic());
+        userSubmissionRepository.save(submission);
     }
 
     private String formatProblemStatement(Question question) {

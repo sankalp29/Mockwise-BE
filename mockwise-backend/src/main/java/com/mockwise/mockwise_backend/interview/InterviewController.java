@@ -6,7 +6,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-import reactor.core.publisher.Mono;
 
 import java.time.Instant;
 import java.util.List;
@@ -74,38 +73,30 @@ public class InterviewController {
     }
 
     @PostMapping("/{interviewId}/submit")
-    public Mono<ResponseEntity<Map<String, Object>>> submitInterview(
+    public ResponseEntity<Map<String, Object>> submitInterview(
             @PathVariable UUID interviewId,
             @RequestBody SubmitInterviewRequest request,
             Authentication authentication) {
         
         log.info("Submitting interview: {} with {} submissions", interviewId, request.getSubmissions().size());
-        log.info("Authentication present: {}", authentication != null);
-        log.info("Authentication type: {}", authentication != null ? authentication.getClass().getSimpleName() : "null");
         
         try {
-            // End the interview and save submissions
             Interview interview = interviewService.endInterview(interviewId, request.getSubmissions());
             log.info("Interview ended successfully: {}", interview.getId());
 
             interviewService.markQuestionsAsSeen(interview.getUserId(), interview);
 
-            // Generate feedback asynchronously (fire-and-forget)
-            log.info("*****STARTING FEEDBACK GENERATION******");
-            interviewService.generateFeedbackForInterview(interviewId)
-                    .doOnError(e -> log.error("Async feedback generation failed for interview: {}", interviewId, e))
-                    .subscribe(); // Fire-and-forget
+            // Runs asynchronously via @Async — returns immediately
+            interviewService.generateFeedbackForInterview(interviewId);
 
-            // Return immediate success response
-            Map<String, Object> response = Map.of(
+            return ResponseEntity.ok(Map.of(
                 "message", "Interview submitted successfully",
                 "interviewId", interview.getId().toString()
-            );
-            return Mono.just(ResponseEntity.ok(response));
+            ));
 
         } catch (Exception e) {
             log.error("Error submitting interview", e);
-            return Mono.just(ResponseEntity.badRequest().body(Map.of("error", (Object) e.getMessage())));
+            return ResponseEntity.badRequest().body(Map.of("error", (Object) e.getMessage()));
         }
     }
 
@@ -151,7 +142,7 @@ public class InterviewController {
     @PostMapping("/{interviewId}/generate-feedback")
     public ResponseEntity<?> generateFeedback(@PathVariable UUID interviewId) {
         try {
-            interviewService.generateFeedbackForInterview(interviewId).subscribe();
+            interviewService.generateFeedbackForInterview(interviewId);
             return ResponseEntity.ok(Map.of("status", "started"));
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));

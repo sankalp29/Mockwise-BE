@@ -2,7 +2,6 @@ package com.mockwise.mockwise_backend.interview;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import reactor.core.publisher.Mono;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.slf4j.Logger;
@@ -49,32 +48,29 @@ public class ClaudeService {
         }
     }
 
-    // Single unified Claude API call method
-    public Mono<String> callClaude(String prompt) {
+    public String callClaude(String prompt) {
         log.info("ClaudeService.callClaude called");
         
         if (anthropicClient == null) {
             log.warn("Anthropic client is null, returning fallback");
-            return Mono.just(createFallbackResponse("Anthropic client not initialized"));
+            return createFallbackResponse("Anthropic client not initialized");
         }
         
-        return Mono.fromCallable(() -> {
-            try {
-                var messages = anthropicClient.beta().messages();
-                MessageCreateParams params = MessageCreateParams.builder()
-                        .model("claude-sonnet-4-20250514")
-                        .maxTokens(1500L)
-                        .addUserMessage(prompt)
-                        .build();
+        try {
+            var messages = anthropicClient.beta().messages();
+            MessageCreateParams params = MessageCreateParams.builder()
+                    .model("claude-sonnet-4-20250514")
+                    .maxTokens(1500L)
+                    .addUserMessage(prompt)
+                    .build();
 
-                Object response = messages.create(params);
-                String serialized = objectMapper.writeValueAsString(response);
-                return extractContentFromResponse(serialized);
-            } catch (Exception e) {
-                log.error("Error calling Anthropic SDK: {} - {}", e.getClass().getSimpleName(), String.valueOf(e.getMessage()));
-                return createFallbackResponse("Claude API call failed: " + e.getMessage());
-            }
-        });
+            Object response = messages.create(params);
+            String serialized = objectMapper.writeValueAsString(response);
+            return extractContentFromResponse(serialized);
+        } catch (Exception e) {
+            log.error("Error calling Anthropic SDK: {} - {}", e.getClass().getSimpleName(), String.valueOf(e.getMessage()));
+            return createFallbackResponse("Claude API call failed: " + e.getMessage());
+        }
     }
 
     // Helper: Generate prompt for code feedback evaluation (includes optional user self-assessment)
