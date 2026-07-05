@@ -1,10 +1,20 @@
 package com.mockwise.mockwise_backend.interview;
 
+import com.mockwise.mockwise_backend.auth.AuthSupport;
 import com.mockwise.mockwise_backend.auth.SupabaseAuthService;
+import com.mockwise.mockwise_backend.common.exception.BadRequestException;
+import com.mockwise.mockwise_backend.common.exception.ResourceGoneException;
+import com.mockwise.mockwise_backend.common.exception.ResourceNotFoundException;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -16,109 +26,75 @@ import java.util.UUID;
 @RequestMapping("/api/interview")
 @RequiredArgsConstructor
 @Slf4j
+@Validated
 public class InterviewController {
 
     private final InterviewService interviewService;
     private final QuestionCodeStubRepository questionCodeStubRepository;
 
     @PostMapping("/start")
-    public ResponseEntity<?> startInterview(
-            @RequestBody StartInterviewRequest request,
+    public ResponseEntity<Map<String, Object>> startInterview(
+            @Valid @RequestBody StartInterviewRequest request,
             Authentication authentication) {
-        
-        log.info("Starting interview with request: difficulty={}, numQuestions={}, timeMinutes={}", 
-                 request.getDifficulty(), request.getNumQuestions(), request.getTimeMinutes());
-        log.info("Authentication: {}", authentication);
-        
-        try {
-            // Validate request
-            if (request.getDifficulty() == null) {
-                log.error("Difficulty is null in request");
-                return ResponseEntity.badRequest().body(Map.of("error", "Difficulty is required"));
-            }
-            if (request.getNumQuestions() == null || request.getNumQuestions() <= 0) {
-                log.error("Invalid numQuestions: {}", request.getNumQuestions());
-                return ResponseEntity.badRequest().body(Map.of("error", "Number of questions must be positive"));
-            }
-            if (request.getTimeMinutes() == null || request.getTimeMinutes() <= 0) {
-                log.error("Invalid timeMinutes: {}", request.getTimeMinutes());
-                return ResponseEntity.badRequest().body(Map.of("error", "Time minutes must be positive"));
-            }
-            
-            // Get Supabase user from authentication
-            SupabaseAuthService.SupabaseUser user = extractSupabaseUser(authentication);
-            log.info("User extracted successfully: {}", user.getEmail());
-            
-            Interview interview = interviewService.startInterview(
-                user, 
-                request.getDifficulty(), 
-                request.getNumQuestions(), 
+
+        log.info("Starting interview: difficulty={}, numQuestions={}, timeMinutes={}",
+                request.getDifficulty(), request.getNumQuestions(), request.getTimeMinutes());
+
+        SupabaseAuthService.SupabaseUser user = AuthSupport.requireUser(authentication);
+
+        Interview interview = interviewService.startInterview(
+                user,
+                request.getDifficulty(),
+                request.getNumQuestions(),
                 request.getTimeMinutes()
-            );
-            
-            // Get the assigned questions from the interview
-            List<Question> questions = interview.getAssignedQuestions();
-            
-            log.info("Interview created with {} assigned questions for difficulty: {}", 
-                     questions.size(), request.getDifficulty());
-            
-            return ResponseEntity.ok(Map.of(
+        );
+
+        List<Question> questions = interview.getAssignedQuestions();
+        log.info("Interview {} created with {} questions for difficulty {}",
+                interview.getId(), questions.size(), request.getDifficulty());
+
+        return ResponseEntity.ok(Map.of(
                 "interview", interview,
                 "questions", questions
-            ));
-        } catch (Exception e) {
-            log.error("Error starting interview", e);
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
+        ));
     }
 
     @PostMapping("/{interviewId}/submit")
     public ResponseEntity<Map<String, Object>> submitInterview(
             @PathVariable UUID interviewId,
-            @RequestBody SubmitInterviewRequest request,
+            @Valid @RequestBody SubmitInterviewRequest request,
             Authentication authentication) {
-        
-        log.info("Submitting interview: {} with {} submissions", interviewId, request.getSubmissions().size());
-        
-        try {
-            Interview interview = interviewService.endInterview(interviewId, request.getSubmissions());
-            log.info("Interview ended successfully: {}", interview.getId());
 
-            interviewService.markQuestionsAsSeen(interview.getUserId(), interview);
+        SupabaseAuthService.SupabaseUser user = AuthSupport.requireUser(authentication);
+        log.info("Submitting interview {} with {} submissions for user {}",
+                interviewId, request.getSubmissions().size(), user.getId());
 
-            // Runs asynchronously via @Async — returns immediately
-            interviewService.generateFeedbackForInterview(interviewId);
+        Interview interview = interviewService.endInterview(interviewId, user.getId(), request.getSubmissions());
+        interviewService.markQuestionsAsSeen(interview.getUserId(), interview);
+        // Async — returns immediately
+        interviewService.generateFeedbackForInterview(interviewId);
 
-            return ResponseEntity.ok(Map.of(
+        return ResponseEntity.ok(Map.of(
                 "message", "Interview submitted successfully",
                 "interviewId", interview.getId().toString()
-            ));
-
-        } catch (Exception e) {
-            log.error("Error submitting interview", e);
-            return ResponseEntity.badRequest().body(Map.of("error", (Object) e.getMessage()));
-        }
+        ));
     }
 
     @GetMapping("/{interviewId}/feedback")
-    public ResponseEntity<?> getInterviewFeedback(@PathVariable UUID interviewId, Authentication authentication) {
-        try {
-            log.info("Getting interview feedback for interview: {}", interviewId);
-            log.info("Authentication Info: {}", authentication);
-            Interview interview = interviewService.getInterviewWithFeedback(interviewId);
-            
-            log.info("Getting submissions with feedback for interview: {}", interviewId);
-            List<UserSubmission> submissions = interviewService.getSubmissionsWithFeedback(interviewId);
-            log.info("Submissions with feedback: {}", submissions);
-            
-            return ResponseEntity.ok(Map.of(
+    public ResponseEntity<Map<String, Object>> getInterviewFeedback(
+            @PathVariable UUID interviewId,
+            Authentication authentication) {
+
+        SupabaseAuthService.SupabaseUser user = AuthSupport.requireUser(authentication);
+        log.info("Getting feedback for interview {} for user {}", interviewId, user.getId());
+
+        Interview interview = interviewService.getInterviewForUser(interviewId, user.getId());
+        List<UserSubmission> submissions = interviewService.getSubmissionsWithFeedback(interviewId);
+
+        return ResponseEntity.ok(Map.of(
                 "interview", interview,
                 "submissions", submissions
-            ));
-        } catch (Exception e) {
-            log.error("Error getting interview feedback", e);
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
+        ));
     }
 
     @GetMapping("/questions/{questionId}/stub")
@@ -126,160 +102,149 @@ public class InterviewController {
             @PathVariable UUID questionId,
             @RequestParam String language,
             Authentication authentication) {
-        try {
-            // Ensure user is authenticated
-            extractSupabaseUser(authentication);
-            return questionCodeStubRepository
-                    .findFirstByQuestion_IdAndLanguageIgnoreCase(questionId, language)
-                    .map(stub -> ResponseEntity.ok(stub.getStub()))
-                    .orElseGet(() -> ResponseEntity.status(404).body("// No code stub available for this language"));
-        } catch (Exception e) {
-            log.error("Error fetching code stub for question {} and language {}", questionId, language, e);
-            return ResponseEntity.status(500).body("// Error fetching stub");
+
+        AuthSupport.requireUser(authentication);
+
+        if (language == null || language.isBlank()) {
+            throw new BadRequestException("Language parameter is required");
         }
+
+        return questionCodeStubRepository
+                .findFirstByQuestion_IdAndLanguageIgnoreCase(questionId, language)
+                .map(stub -> ResponseEntity.ok(stub.getStub()))
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No code stub available for question " + questionId + " and language " + language));
     }
 
     @PostMapping("/{interviewId}/generate-feedback")
-    public ResponseEntity<?> generateFeedback(@PathVariable UUID interviewId) {
-        try {
-            interviewService.generateFeedbackForInterview(interviewId);
-            return ResponseEntity.ok(Map.of("status", "started"));
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
-        }
+    public ResponseEntity<Map<String, String>> generateFeedback(
+            @PathVariable UUID interviewId,
+            Authentication authentication) {
+
+        SupabaseAuthService.SupabaseUser user = AuthSupport.requireUser(authentication);
+        // Ensures interview exists and caller owns it before kicking off async work
+        interviewService.getInterviewForUser(interviewId, user.getId());
+        interviewService.generateFeedbackForInterview(interviewId);
+        return ResponseEntity.ok(Map.of("status", "started"));
     }
 
     @GetMapping("/questions")
     public ResponseEntity<List<Question>> getQuestions(
             @RequestParam Question.Difficulty difficulty,
-            @RequestParam(defaultValue = "3") int count,
+            @RequestParam(defaultValue = "3") @Min(1) int count,
             Authentication authentication) {
-        
-        String userId = null;
-        if (authentication != null) {
-            try {
-                SupabaseAuthService.SupabaseUser user = extractSupabaseUser(authentication);
-                userId = user.getId();
-            } catch (Exception e) {
-                log.warn("Could not extract user from authentication, using non-user-specific question selection", e);
-            }
-        }
-        
+
+        SupabaseAuthService.SupabaseUser user = AuthSupport.optionalUser(authentication);
+        String userId = user != null ? user.getId() : null;
         List<Question> questions = interviewService.getRandomQuestionsForUser(userId, difficulty, count);
         return ResponseEntity.ok(questions);
     }
 
     @GetMapping("/{interviewId}/validate")
-    public ResponseEntity<?> validateInterviewSession(
+    public ResponseEntity<Map<String, Object>> validateInterviewSession(
             @PathVariable UUID interviewId,
             Authentication authentication) {
-        
-        try {
-            log.info("Validating interview session: {}", interviewId);
-            
-            // Get Supabase user from authentication
-            SupabaseAuthService.SupabaseUser user = extractSupabaseUser(authentication);
-            log.info("User extracted for validation: {}", user.getEmail());
-            
-            Interview interview = interviewService.validateInterviewAccess(interviewId, user.getId());
-            
-            // Calculate remaining time
-            long startTime = interview.getStartedAt().toEpochMilli();
-            long totalTimeMs = interview.getTimeMinutes() * 60 * 1000L;
-            long currentTime = System.currentTimeMillis();
-            long elapsedMs = currentTime - startTime;
-            long remainingMs = Math.max(0, totalTimeMs - elapsedMs);
-            
-            if (remainingMs <= 0) {
-                return ResponseEntity.status(410).body(Map.of(
-                    "error", "Interview has ended",
-                    "expired", true
-                ));
-            }
-            
-            return ResponseEntity.ok(Map.of(
+
+        SupabaseAuthService.SupabaseUser user = AuthSupport.requireUser(authentication);
+        log.info("Validating interview session {} for user {}", interviewId, user.getId());
+
+        Interview interview = interviewService.validateInterviewAccess(interviewId, user.getId());
+
+        long startTime = interview.getStartedAt().toEpochMilli();
+        long totalTimeMs = interview.getTimeMinutes() * 60 * 1000L;
+        long remainingMs = Math.max(0, totalTimeMs - (System.currentTimeMillis() - startTime));
+
+        if (remainingMs <= 0) {
+            throw new ResourceGoneException(
+                    "Interview has ended",
+                    Map.of("expired", true, "valid", false));
+        }
+
+        return ResponseEntity.ok(Map.of(
                 "interview", interview,
                 "questions", interview.getAssignedQuestions(),
                 "remainingTimeMs", remainingMs,
                 "valid", true
-            ));
-            
-        } catch (IllegalArgumentException e) {
-            log.warn("Interview validation failed: {}", e.getMessage());
-            return ResponseEntity.status(404).body(Map.of(
-                "error", e.getMessage(),
-                "valid", false
-            ));
-        } catch (SecurityException e) {
-            log.warn("Unauthorized interview access attempt: {}", e.getMessage());
-            return ResponseEntity.status(403).body(Map.of(
-                "error", "You don't have access to this interview session",
-                "valid", false
-            ));
-        } catch (Exception e) {
-            log.error("Error validating interview session", e);
-            return ResponseEntity.status(500).body(Map.of(
-                "error", "Internal server error",
-                "valid", false
-            ));
-        }
+        ));
     }
 
     @GetMapping("/optimal-code")
-    public ResponseEntity<?> getOptimalCode(
+    public ResponseEntity<Map<String, String>> getOptimalCode(
             @RequestParam UUID questionId,
             @RequestParam String language,
             Authentication authentication) {
-        try {
-            log.info("Fetching optimal code for questionId: {}, language: {}", questionId, language);
-            // Ensure user is authenticated
-            extractSupabaseUser(authentication);
-            String code = interviewService.getOptimalCode(questionId, language);
-            if (code == null || code.isBlank()) {
-                return ResponseEntity.status(404).body(Map.of("error", "Optimal code not found"));
-            }
-            return ResponseEntity.ok(Map.of("code", code));
-        } catch (Exception e) {
-            log.error("Error fetching optimal code", e);
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+
+        AuthSupport.requireUser(authentication);
+        log.info("Fetching optimal code for questionId={}, language={}", questionId, language);
+
+        if (language == null || language.isBlank()) {
+            throw new BadRequestException("Language parameter is required");
         }
+
+        String code = interviewService.getOptimalCode(questionId, language);
+        if (code == null || code.isBlank()) {
+            throw new ResourceNotFoundException("Optimal code not found for question " + questionId
+                    + " and language " + language);
+        }
+        return ResponseEntity.ok(Map.of("code", code));
     }
-    
+
     @GetMapping("/test-auth")
-    public ResponseEntity<?> testAuth(Authentication authentication) {
-        log.info("Testing authentication...");
-        log.info("Authentication: {}", authentication);
-        
-        try {
-            SupabaseAuthService.SupabaseUser user = extractSupabaseUser(authentication);
-            log.info("User found: {}", user.getEmail());
-            return ResponseEntity.ok(Map.of("user", user.getEmail(), "status", "authenticated"));
-        } catch (Exception e) {
-            log.error("Authentication failed: ", e);
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
+    public ResponseEntity<Map<String, String>> testAuth(Authentication authentication) {
+        SupabaseAuthService.SupabaseUser user = AuthSupport.requireUser(authentication);
+        return ResponseEntity.ok(Map.of("user", user.getEmail(), "status", "authenticated"));
     }
 
-    private SupabaseAuthService.SupabaseUser extractSupabaseUser(Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new IllegalArgumentException("No authentication found");
-        }
-        
-        Object principal = authentication.getPrincipal();
-        if (principal instanceof SupabaseAuthService.SupabaseUser user) {
-            return user;
-        }
-        
-        throw new IllegalArgumentException("Invalid authentication type: " + principal.getClass().getSimpleName());
+    @PostMapping("/check-syntax")
+    public ResponseEntity<Map<String, Object>> checkSyntax(
+            @Valid @RequestBody CheckSyntaxRequest request,
+            Authentication authentication) {
+
+        AuthSupport.requireUser(authentication);
+        log.info("Checking syntax for language: {}", request.getLanguage());
+        List<String> errors = interviewService.checkSyntax(request.getCode(), request.getLanguage());
+        return ResponseEntity.ok(Map.of("errors", errors));
     }
 
-    // Request DTOs
+    @GetMapping("/ongoing")
+    public ResponseEntity<Map<String, Object>> getOngoingInterview(Authentication authentication) {
+        SupabaseAuthService.SupabaseUser user = AuthSupport.requireUser(authentication);
+        log.info("Checking for ongoing interview for user: {}", user.getId());
+
+        Interview ongoingInterview = interviewService.findOngoingInterviewByUserId(user.getId());
+
+        if (ongoingInterview == null) {
+            return ResponseEntity.ok(Map.of("hasOngoingInterview", false));
+        }
+
+        Instant now = Instant.now();
+        long elapsedMinutes = java.time.Duration.between(ongoingInterview.getStartedAt(), now).toMinutes();
+        long remainingMinutes = ongoingInterview.getTimeMinutes() - elapsedMinutes;
+
+        return ResponseEntity.ok(Map.of(
+                "hasOngoingInterview", true,
+                "interviewId", ongoingInterview.getId(),
+                "startedAt", ongoingInterview.getStartedAt(),
+                "difficulty", ongoingInterview.getDifficulty(),
+                "numQuestions", ongoingInterview.getNumQuestions(),
+                "timeMinutes", ongoingInterview.getTimeMinutes(),
+                "elapsedMinutes", elapsedMinutes,
+                "remainingMinutes", Math.max(0, remainingMinutes)
+        ));
+    }
+
     public static class StartInterviewRequest {
+        @NotNull(message = "Difficulty is required")
         private Question.Difficulty difficulty;
+
+        @NotNull(message = "Number of questions is required")
+        @Min(value = 1, message = "Number of questions must be at least 1")
         private Integer numQuestions;
+
+        @NotNull(message = "Time minutes is required")
+        @Min(value = 1, message = "Time minutes must be at least 1")
         private Integer timeMinutes;
 
-        // Constructors, getters, setters
         public StartInterviewRequest() {}
 
         public Question.Difficulty getDifficulty() { return difficulty; }
@@ -293,64 +258,22 @@ public class InterviewController {
     }
 
     public static class SubmitInterviewRequest {
+        @NotEmpty(message = "At least one submission is required")
         private List<InterviewService.SubmissionRequest> submissions;
 
         public SubmitInterviewRequest() {}
 
         public List<InterviewService.SubmissionRequest> getSubmissions() { return submissions; }
-        public void setSubmissions(List<InterviewService.SubmissionRequest> submissions) { this.submissions = submissions; }
-    }
-
-    @PostMapping("/check-syntax")
-    public ResponseEntity<?> checkSyntax(
-            @RequestBody CheckSyntaxRequest request,
-            Authentication authentication) {
-        log.info("Checking syntax for language: {}", request.getLanguage());
-        try {
-            List<String> errors = interviewService.checkSyntax(request.getCode(), request.getLanguage());
-            return ResponseEntity.ok(Map.of("errors", errors));
-        } catch (Exception e) {
-            log.error("Error checking syntax", e);
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        public void setSubmissions(List<InterviewService.SubmissionRequest> submissions) {
+            this.submissions = submissions;
         }
     }
-
-    @GetMapping("/ongoing")
-    public ResponseEntity<?> getOngoingInterview(Authentication authentication) {
-        try {
-            SupabaseAuthService.SupabaseUser user = extractSupabaseUser(authentication);
-            log.info("Checking for ongoing interview for user: {}", user.getEmail());
-            
-            Interview ongoingInterview = interviewService.findOngoingInterviewByUserId(user.getId());
-            
-            if (ongoingInterview != null) {
-                // Calculate remaining time
-                Instant now = Instant.now();
-                long elapsedMinutes = java.time.Duration.between(ongoingInterview.getStartedAt(), now).toMinutes();
-                long remainingMinutes = ongoingInterview.getTimeMinutes() - elapsedMinutes;
-                
-                return ResponseEntity.ok(Map.of(
-                    "hasOngoingInterview", true,
-                    "interviewId", ongoingInterview.getId(),
-                    "startedAt", ongoingInterview.getStartedAt(),
-                    "difficulty", ongoingInterview.getDifficulty(),
-                    "numQuestions", ongoingInterview.getNumQuestions(),
-                    "timeMinutes", ongoingInterview.getTimeMinutes(),
-                    "elapsedMinutes", elapsedMinutes,
-                    "remainingMinutes", Math.max(0, remainingMinutes)
-                ));
-            } else {
-                return ResponseEntity.ok(Map.of("hasOngoingInterview", false));
-            }
-        } catch (Exception e) {
-            log.error("Error checking for ongoing interview", e);
-            return ResponseEntity.status(500).body(Map.of("error", "Failed to check for ongoing interview"));
-        }
-    }
-
 
     public static class CheckSyntaxRequest {
+        @NotBlank(message = "Code is required")
         private String code;
+
+        @NotBlank(message = "Language is required")
         private String language;
 
         public CheckSyntaxRequest() {}

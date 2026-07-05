@@ -1,6 +1,10 @@
 package com.mockwise.mockwise_backend.interview;
 
 import com.mockwise.mockwise_backend.auth.SupabaseAuthService;
+import com.mockwise.mockwise_backend.common.exception.AppException;
+import com.mockwise.mockwise_backend.common.exception.BadRequestException;
+import com.mockwise.mockwise_backend.common.exception.ForbiddenException;
+import com.mockwise.mockwise_backend.common.exception.ResourceNotFoundException;
 
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -80,11 +84,18 @@ public class InterviewService {
     }
 
     @Transactional
-    public Interview endInterview(UUID interviewId, List<SubmissionRequest> submissions) {
-        log.info("Ending interview: {} with {} submissions", interviewId, submissions.size());
+    public Interview endInterview(UUID interviewId, String userId, List<SubmissionRequest> submissions) {
+        log.info("Ending interview: {} with {} submissions for user {}", interviewId, submissions.size(), userId);
 
-        Interview interview = interviewRepository.findById(interviewId)
-                .orElseThrow(() -> new IllegalArgumentException("Interview not found"));
+        if (submissions == null || submissions.isEmpty()) {
+            throw new BadRequestException("At least one submission is required");
+        }
+
+        Interview interview = getInterviewForUser(interviewId, userId);
+
+        if (interview.getStatus() != Interview.Status.IN_PROGRESS) {
+            throw new BadRequestException("Interview is not in progress and cannot be submitted");
+        }
 
         interview.setEndedAt(Instant.now());
         interview.setStatus(Interview.Status.COMPLETED);
@@ -105,7 +116,7 @@ public class InterviewService {
         for (SubmissionRequest submissionReq : submissions) {
             Question question = questionById.get(submissionReq.getQuestionId());
             if (question == null) {
-                throw new IllegalArgumentException("Question not found: " + submissionReq.getQuestionId());
+                throw new ResourceNotFoundException("Question", submissionReq.getQuestionId());
             }
 
             UserSubmission submission = new UserSubmission();
@@ -422,7 +433,17 @@ public class InterviewService {
 
     public Interview getInterviewWithFeedback(UUID interviewId) {
         return interviewRepository.findById(interviewId)
-                .orElseThrow(() -> new IllegalArgumentException("Interview not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Interview", interviewId));
+    }
+
+    /**
+     * Load an interview and ensure it belongs to the given user.
+     */
+    public Interview getInterviewForUser(UUID interviewId, String userId) {
+        Interview interview = interviewRepository.findById(interviewId)
+                .orElseThrow(() -> new ResourceNotFoundException("Interview", interviewId));
+        assertOwnsInterview(interview, userId);
+        return interview;
     }
 
     public List<UserSubmission> getSubmissionsWithFeedback(UUID interviewId) {
@@ -431,16 +452,15 @@ public class InterviewService {
 
     public Interview validateInterviewAccess(UUID interviewId, String userId) {
         log.info("Validating interview access: interviewId={}, userId={}", interviewId, userId);
-        
-        Interview interview = interviewRepository.findById(interviewId)
-                .orElseThrow(() -> new IllegalArgumentException("Interview not found"));
-        
-        if (!interview.getUserId().equals(userId)) {
-            throw new SecurityException("User does not have access to this interview");
-        }
-        
+        Interview interview = getInterviewForUser(interviewId, userId);
         log.info("Interview access validated successfully for user: {}", userId);
         return interview;
+    }
+
+    private void assertOwnsInterview(Interview interview, String userId) {
+        if (interview.getUserId() == null || !interview.getUserId().equals(userId)) {
+            throw new ForbiddenException("You do not have access to this interview session");
+        }
     }
 
     public String getOptimalCode(UUID questionId, String language) {
@@ -467,30 +487,37 @@ public class InterviewService {
         }
     }
 
-    // Placeholder for syntax checking
+    /**
+     * Syntax check returns a list of diagnostic messages (empty = success).
+     * Tooling/environment failures are mapped to a clear client-facing error.
+     */
     public List<String> checkSyntax(String code, String language) {
+        if (code == null || code.isBlank()) {
+            throw new BadRequestException("Code is required for syntax check");
+        }
+        if (language == null || language.isBlank()) {
+            throw new BadRequestException("Language is required for syntax check");
+        }
+
         log.info("Performing syntax check for language: {}", language);
-        List<String> errors = new ArrayList<>();
         File tempDir = null;
 
         try {
             tempDir = Files.createTempDirectory("syntax_check").toFile();
 
-            switch (language.toLowerCase()) {
-                case "java":
-                    return checkJavaSyntax(code, tempDir);
-                case "python":
-                    return checkPythonSyntax(code, tempDir);
-                case "cpp":
-                    return checkCppSyntax(code, tempDir);
-                default:
-                    errors.add("Unsupported language for syntax checking: " + language);
-                    return errors;
-            }
+            return switch (language.toLowerCase()) {
+                case "java" -> checkJavaSyntax(code, tempDir);
+                case "python" -> checkPythonSyntax(code, tempDir);
+                case "cpp", "c++" -> checkCppSyntax(code, tempDir);
+                default -> throw new BadRequestException(
+                        "Unsupported language for syntax checking: " + language);
+            };
+        } catch (AppException ex) {
+            throw ex;
         } catch (Exception e) {
             log.error("Exception during syntax check for language {}", language, e);
-            errors.add("Internal server error during syntax check: " + e.getMessage());
-            return errors;
+            // Graceful degradation: return a diagnostic rather than 500 when tooling is missing
+            return List.of("Syntax check could not be completed: " + safeToolingMessage(e));
         } finally {
             if (tempDir != null) {
                 try {
@@ -503,6 +530,14 @@ public class InterviewService {
                 }
             }
         }
+    }
+
+    private static String safeToolingMessage(Exception e) {
+        String msg = e.getMessage();
+        if (msg == null || msg.isBlank()) {
+            return "an unexpected tooling error occurred";
+        }
+        return msg.length() > 200 ? msg.substring(0, 200) : msg;
     }
 
     private List<String> checkJavaSyntax(String code, File tempDir) throws Exception {
