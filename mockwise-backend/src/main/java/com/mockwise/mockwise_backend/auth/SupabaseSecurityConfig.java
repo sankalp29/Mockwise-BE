@@ -1,5 +1,7 @@
 package com.mockwise.mockwise_backend.auth;
 
+import com.mockwise.mockwise_backend.common.security.JsonAccessDeniedHandler;
+import com.mockwise.mockwise_backend.common.security.JsonAuthEntryPoint;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -18,9 +20,15 @@ import java.util.List;
 public class SupabaseSecurityConfig {
 
     private final SupabaseAuthFilter supabaseAuthFilter;
+    private final JsonAuthEntryPoint jsonAuthEntryPoint;
+    private final JsonAccessDeniedHandler jsonAccessDeniedHandler;
 
-    public SupabaseSecurityConfig(SupabaseAuthFilter supabaseAuthFilter) {
+    public SupabaseSecurityConfig(SupabaseAuthFilter supabaseAuthFilter,
+                                  JsonAuthEntryPoint jsonAuthEntryPoint,
+                                  JsonAccessDeniedHandler jsonAccessDeniedHandler) {
         this.supabaseAuthFilter = supabaseAuthFilter;
+        this.jsonAuthEntryPoint = jsonAuthEntryPoint;
+        this.jsonAccessDeniedHandler = jsonAccessDeniedHandler;
     }
 
     @Bean
@@ -29,8 +37,12 @@ public class SupabaseSecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint(jsonAuthEntryPoint)
+                .accessDeniedHandler(jsonAccessDeniedHandler)
+            )
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/", "/health").permitAll()
+                .requestMatchers("/", "/health", "/error").permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(supabaseAuthFilter, UsernamePasswordAuthenticationFilter.class);
@@ -42,9 +54,9 @@ public class SupabaseSecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         var config = new CorsConfiguration();
         config.setAllowedOrigins(List.of(
-            "http://localhost:5173",  // Local development
-            "https://mockwise.in",    // Production domain
-            "https://mockwise-be-production.up.railway.app"  // Railway backend (if needed)
+            "http://localhost:5173",
+            "https://mockwise.in",
+            "https://mockwise-be-production.up.railway.app"
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));

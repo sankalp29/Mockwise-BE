@@ -1,6 +1,8 @@
 package com.mockwise.mockwise_backend.interview;
 
 import com.mockwise.mockwise_backend.auth.SupabaseAuthService;
+import com.mockwise.mockwise_backend.common.exception.ForbiddenException;
+import com.mockwise.mockwise_backend.common.exception.ResourceNotFoundException;
 
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -85,7 +87,7 @@ public class InterviewService {
         log.info("Ending interview: {} with {} submissions", interviewId, submissions.size());
 
         Interview interview = interviewRepository.findById(interviewId)
-                .orElseThrow(() -> new IllegalArgumentException("Interview not found"));
+                .orElseThrow(() -> ResourceNotFoundException.of("Interview"));
 
         interview.setEndedAt(Instant.now());
         interview.setStatus(Interview.Status.COMPLETED);
@@ -106,7 +108,7 @@ public class InterviewService {
         for (SubmissionRequest submissionReq : submissions) {
             Question question = questionById.get(submissionReq.getQuestionId());
             if (question == null) {
-                throw new IllegalArgumentException("Question not found: " + submissionReq.getQuestionId());
+                throw ResourceNotFoundException.of("Question");
             }
 
             UserSubmission submission = new UserSubmission();
@@ -442,7 +444,7 @@ public class InterviewService {
 
     public Interview getInterviewWithFeedback(UUID interviewId) {
         return interviewRepository.findById(interviewId)
-                .orElseThrow(() -> new IllegalArgumentException("Interview not found"));
+                .orElseThrow(() -> ResourceNotFoundException.of("Interview"));
     }
 
     public List<UserSubmission> getSubmissionsWithFeedback(UUID interviewId) {
@@ -453,10 +455,10 @@ public class InterviewService {
         log.info("Validating interview access: interviewId={}, userId={}", interviewId, userId);
         
         Interview interview = interviewRepository.findById(interviewId)
-                .orElseThrow(() -> new IllegalArgumentException("Interview not found"));
+                .orElseThrow(() -> ResourceNotFoundException.of("Interview"));
         
         if (!interview.getUserId().equals(userId)) {
-            throw new SecurityException("User does not have access to this interview");
+            throw new ForbiddenException("You do not have access to this interview session.");
         }
         
         log.info("Interview access validated successfully for user: {}", userId);
