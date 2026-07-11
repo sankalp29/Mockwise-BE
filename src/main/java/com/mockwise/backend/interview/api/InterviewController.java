@@ -1,7 +1,9 @@
 package com.mockwise.backend.interview.api;
 
 import com.mockwise.backend.auth.SupabaseUser;
+import com.mockwise.backend.codesyntax.LanguageSupportService;
 import com.mockwise.backend.codesyntax.SyntaxCheckService;
+import com.mockwise.backend.codesyntax.model.SupportedLanguage;
 import com.mockwise.backend.common.util.AuthSupport;
 import com.mockwise.backend.interview.api.dto.CheckSyntaxRequest;
 import com.mockwise.backend.interview.api.dto.StartInterviewRequest;
@@ -36,6 +38,7 @@ public class InterviewController {
     private final QuestionSelectionService questionSelectionService;
     private final OptimalSolutionService optimalSolutionService;
     private final SyntaxCheckService syntaxCheckService;
+    private final LanguageSupportService languageSupportService;
     private final QuestionCodeStubRepository questionCodeStubRepository;
 
     @PostMapping("/start")
@@ -253,6 +256,12 @@ public class InterviewController {
             log.error("Error checking syntax", e);
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
+    }
+
+    @GetMapping("/supported-languages")
+    public ResponseEntity<List<SupportedLanguage>> supportedLanguages(Authentication authentication) {
+        // Auth required by security config; list languages the server can attempt to check
+        return ResponseEntity.ok(languageSupportService.listSupportedLanguages());
     }
 
     @GetMapping("/ongoing")

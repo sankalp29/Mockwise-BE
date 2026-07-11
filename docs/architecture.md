@@ -11,7 +11,29 @@
 | `dashboard` | Metrics/progress API, aggregates, rating extraction |
 | `progress` | User-question-seen tracking |
 | `evaluation` | Claude / Anthropic feedback integration |
-| `codesyntax` | Local syntax checking (Java / Python / C++) |
+| `codesyntax` | Syntax check via Strategy + Registry + Facade (Java / Python / C++ today) |
+
+### `codesyntax` layout (Step 1 multi-language foundation)
+
+```
+codesyntax/
+  LanguageToolchain.java          # Strategy interface
+  LanguageToolchainRegistry.java  # alias-aware lookup
+  SyntaxCheckFacade.java          # workspace + dispatch
+  SyntaxCheckService.java         # API-compatible List<String> adapter
+  model/ SyntaxCheckResult, ToolStatus
+  support/ ProcessRunner, TempWorkspace
+  languages/ JavaToolchain, PythonToolchain, CppToolchain
+```
+
+Add a new language by implementing `LanguageToolchain` as a `@Component` (Open/Closed).
+
+Supported language ids: `java`, `python`, `cpp`, `javascript`, `typescript`, `go`, `rust`, `ruby`, `scala`, `csharp`.
+
+Discovery APIs:
+- `GET /api/interview/supported-languages`
+- `GET /api/codesyntax/languages`
+
 | `common` | Shared exception handling, auth helpers |
 
 ### Layers inside features

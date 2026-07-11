@@ -62,10 +62,10 @@ From the response, use `interview.id` and `questions[0].id` for submit/feedback.
 
 ```bash
 curl -sS -w "\nHTTP %{http_code}\n" \
-  -X POST http://127.0.0.1:8080/api/interview/b42ad138-7d9a-4a63-8338-a8a710eb0f2e/submit \
+  -X POST http://127.0.0.1:8080/api/interview/90af7876-6cc3-43da-8e68-534f14012d45/submit \
   -H "Authorization: Bearer eyJhbGciOiAibm9uZSIsICJ0eXAiOiAiSldUIn0.eyJzdWIiOiAibG9jYWwtdXNlci0wMDEiLCAiZW1haWwiOiAibG9jYWxAdGVzdC5jb20ifQ.bG9jYWw" \
   -H "Content-Type: application/json" \
-  -d '{"submissions":[{"questionId":"05564f0b-97b5-4aff-8686-7ef5450aec4e","code":"int add(int a,int b){return a+b;}","language":"java","timeComplexity":"O(1)","spaceComplexity":"O(1)"}]}'
+  -d '{"submissions":[{"questionId":"32d459b4-41f3-437a-a2fd-30c6246086a3","code":"int add(int a,int b){return a+b;}","language":"java","timeComplexity":"O(1)","spaceComplexity":"O(1)"}]}'
 ```
 
 Replace `{interviewId}` and `questionId` with values from **start**. Example IDs above are samples only.
@@ -75,7 +75,7 @@ Replace `{interviewId}` and `questionId` with values from **start**. Example IDs
 ```bash
 curl -sS -w "\nHTTP %{http_code}\n" \
   -H "Authorization: Bearer eyJhbGciOiAibm9uZSIsICJ0eXAiOiAiSldUIn0.eyJzdWIiOiAibG9jYWwtdXNlci0wMDEiLCAiZW1haWwiOiAibG9jYWxAdGVzdC5jb20ifQ.bG9jYWw" \
-  http://127.0.0.1:8080/api/interview/b42ad138-7d9a-4a63-8338-a8a710eb0f2e/feedback
+  http://127.0.0.1:8080/api/interview/4044e4bc-ea11-42ce-9b0b-2eae8d2f1253/feedback
 ```
 
 ### `POST /api/interview/check-syntax`
@@ -191,3 +191,34 @@ export SPRING_PROFILES_ACTIVE=dev,local
 - DB: `mockwise_local` on `localhost:5432`
 - Config: `src/main/resources/application-local.yml` (gitignored)
 - Without `Authorization`, most APIs return **403** with an **empty body**
+
+
+---
+
+## Supported languages (syntax check)
+
+### `GET /api/interview/supported-languages`
+
+```bash
+curl -sS -w "\nHTTP %{http_code}\n" \
+  -H "Authorization: Bearer eyJhbGciOiAibm9uZSIsICJ0eXAiOiAiSldUIn0.eyJzdWIiOiAibG9jYWwtdXNlci0wMDEiLCAiZW1haWwiOiAibG9jYWxAdGVzdC5jb20ifQ.bG9jYWw" \
+  http://127.0.0.1:8080/api/interview/supported-languages
+```
+
+### `GET /api/codesyntax/languages`
+
+```bash
+curl -sS -w "\nHTTP %{http_code}\n" \
+  -H "Authorization: Bearer eyJhbGciOiAibm9uZSIsICJ0eXAiOiAiSldUIn0.eyJzdWIiOiAibG9jYWwtdXNlci0wMDEiLCAiZW1haWwiOiAibG9jYWxAdGVzdC5jb20ifQ.bG9jYWw" \
+  http://127.0.0.1:8080/api/codesyntax/languages
+```
+
+### `POST /api/codesyntax/check` (structured)
+
+```bash
+curl -sS -w "\nHTTP %{http_code}\n" \
+  -X POST http://127.0.0.1:8080/api/codesyntax/check \
+  -H "Authorization: Bearer eyJhbGciOiAibm9uZSIsICJ0eXAiOiAiSldUIn0.eyJzdWIiOiAibG9jYWwtdXNlci0wMDEiLCAiZW1haWwiOiAibG9jYWxAdGVzdC5jb20ifQ.bG9jYWw" \
+  -H "Content-Type: application/json" \
+  -d '{"language":"javascript","code":"const x = 1;"}'
+```
