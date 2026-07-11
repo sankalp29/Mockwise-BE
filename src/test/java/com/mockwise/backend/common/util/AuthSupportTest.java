@@ -1,6 +1,7 @@
 package com.mockwise.backend.common.util;
 
 import com.mockwise.backend.auth.SupabaseUser;
+import com.mockwise.backend.common.exception.UnauthorizedException;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -18,12 +19,12 @@ class AuthSupportTest {
 
     @Test
     void requireUserRejectsNullAuth() {
-        assertThrows(IllegalArgumentException.class, () -> AuthSupport.requireUser(null));
+        assertThrows(UnauthorizedException.class, () -> AuthSupport.requireUser(null));
     }
 
     @Test
     void requireUserRejectsWrongPrincipalType() {
         Authentication auth = new UsernamePasswordAuthenticationToken("string-principal", null);
-        assertThrows(IllegalArgumentException.class, () -> AuthSupport.requireUser(auth));
+        assertThrows(UnauthorizedException.class, () -> AuthSupport.requireUser(auth));
     }
 }

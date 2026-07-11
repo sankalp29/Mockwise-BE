@@ -1,5 +1,7 @@
 package com.mockwise.backend.auth;
 
+import com.mockwise.backend.common.security.JsonAccessDeniedHandler;
+import com.mockwise.backend.common.security.JsonAuthEntryPoint;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -18,9 +20,15 @@ import java.util.List;
 public class SecurityConfig {
 
     private final SupabaseAuthFilter supabaseAuthFilter;
+    private final JsonAuthEntryPoint jsonAuthEntryPoint;
+    private final JsonAccessDeniedHandler jsonAccessDeniedHandler;
 
-    public SecurityConfig(SupabaseAuthFilter supabaseAuthFilter) {
+    public SecurityConfig(SupabaseAuthFilter supabaseAuthFilter,
+                          JsonAuthEntryPoint jsonAuthEntryPoint,
+                          JsonAccessDeniedHandler jsonAccessDeniedHandler) {
         this.supabaseAuthFilter = supabaseAuthFilter;
+        this.jsonAuthEntryPoint = jsonAuthEntryPoint;
+        this.jsonAccessDeniedHandler = jsonAccessDeniedHandler;
     }
 
     @Bean
@@ -29,8 +37,12 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint(jsonAuthEntryPoint)
+                .accessDeniedHandler(jsonAccessDeniedHandler)
+            )
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/", "/health").permitAll()
+                .requestMatchers("/", "/health", "/error").permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(supabaseAuthFilter, UsernamePasswordAuthenticationFilter.class);
