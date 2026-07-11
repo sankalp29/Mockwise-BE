@@ -19,7 +19,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-import reactor.core.publisher.Mono;
 
 import java.time.Instant;
 import java.util.List;
@@ -92,10 +91,8 @@ public class InterviewController {
                     .toList();
             interviewService.markQuestionsAsSeen(interview.getUserId(), questionIds, interview.getDifficulty());
 
-            // Fire-and-forget feedback (fallback JSON if Claude key missing)
-            feedbackService.generateFeedbackForInterview(interviewId)
-                    .doOnError(e -> log.error("Async feedback generation failed for interview: {}", interviewId, e))
-                    .subscribe();
+            // Async via @Async — no DB transaction held across Claude
+            feedbackService.generateFeedbackForInterview(interviewId);
 
             return ResponseEntity.ok(Map.of(
                     "message", "Interview submitted successfully",
@@ -142,7 +139,7 @@ public class InterviewController {
     @PostMapping("/{interviewId}/generate-feedback")
     public ResponseEntity<?> generateFeedback(@PathVariable UUID interviewId) {
         try {
-            feedbackService.generateFeedbackForInterview(interviewId).subscribe();
+            feedbackService.generateFeedbackForInterview(interviewId);
             return ResponseEntity.ok(Map.of("status", "started"));
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));

@@ -4,15 +4,19 @@ spring:
     driver-class-name: org.h2.Driver
     username: sa
     password:
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      connection-timeout: 10000
+      leak-detection-threshold: 5000
   jpa:
     hibernate:
       ddl-auto: create-drop
     database-platform: org.hibernate.dialect.H2Dialect
+    open-in-view: false
     show-sql: false
   flyway:
     enabled: false
-  autoconfigure:
-    exclude: []
 
 supabase:
   url: http://localhost
@@ -28,5 +32,3 @@ claude:
 judge0:
   api:
     key: test-key
-
-# Security still loads; context load test does not hit secured endpoints.
