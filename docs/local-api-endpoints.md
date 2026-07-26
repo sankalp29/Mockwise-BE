@@ -1,6 +1,6 @@
 # Local API endpoints
 
-Use when running the backend against the local database (`SPRING_PROFILES_ACTIVE=dev,local`).
+Use when running the backend against the local database (`SPRING_PROFILES_ACTIVE=local`, which is the default).
 
 **Base URL:** `http://127.0.0.1:8080`
 
@@ -184,14 +184,15 @@ curl -sS -w "\nHTTP %{http_code}\n" \
 
 ```bash
 cd /Users/sankalpbhagwat/Desktop/MockWise/Mockwise-BE
-export SPRING_PROFILES_ACTIVE=dev,local
+# Profile "local" is the default; export only if you overrode it.
+export SPRING_PROFILES_ACTIVE=local
 ./mvnw spring-boot:run
 ```
 
-- DB: `mockwise_local` on `localhost:5432`
-- Config: `src/main/resources/application-local.yml` (gitignored)
-- Without `Authorization`, most APIs return **403** with an **empty body**
-
+- DB: `mockwise_local` on `localhost:5432` (create with `createdb mockwise_local` if needed)
+- Config: `src/main/resources/application-local.yml` (committed safe defaults)
+- Optional secrets: `application-local-secrets.yml` (gitignored; see `.example`)
+- Without `Authorization`, most APIs return **401/403**
 
 ---
 

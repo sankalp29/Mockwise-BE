@@ -1,11 +1,14 @@
 package com.mockwise.backend.interview.application;
 
 import com.mockwise.backend.auth.SupabaseUser;
+import com.mockwise.backend.common.exception.BadRequestException;
+import com.mockwise.backend.common.exception.ConflictException;
 import com.mockwise.backend.common.exception.ForbiddenException;
 import com.mockwise.backend.common.exception.ResourceNotFoundException;
 import com.mockwise.backend.interview.api.dto.SubmissionRequest;
 import com.mockwise.backend.interview.domain.Interview;
 import com.mockwise.backend.interview.domain.InterviewQuestion;
+import com.mockwise.backend.interview.infrastructure.InterviewQuestionRepository;
 import com.mockwise.backend.interview.infrastructure.InterviewRepository;
 import com.mockwise.backend.progress.application.UserQuestionSeenService;
 import com.mockwise.backend.question.application.QuestionSelectionService;
@@ -21,8 +24,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -35,6 +40,7 @@ public class InterviewService {
     private final UserSubmissionRepository userSubmissionRepository;
     private final QuestionSelectionService questionSelectionService;
     private final UserQuestionSeenService userQuestionSeenService;
+    private final InterviewQuestionRepository interviewQuestionRepository;
 
     @Transactional
     public Interview startInterview(SupabaseUser user, Question.Difficulty difficulty,
@@ -67,12 +73,43 @@ public class InterviewService {
         return saved;
     }
 
-    @Transactional
-    public Interview endInterview(UUID interviewId, List<SubmissionRequest> submissions) {
-        log.info("Ending interview: {} with {} submissions", interviewId, submissions.size());
-
+    /**
+     * Load interview and enforce ownership. Throws 404 if missing, 403 if not owner.
+     */
+    public Interview requireOwnedInterview(UUID interviewId, String userId) {
         Interview interview = interviewRepository.findById(interviewId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Interview"));
+        if (!interview.getUserId().equals(userId)) {
+            throw new ForbiddenException("You do not have access to this interview session.");
+        }
+        return interview;
+    }
+
+    /**
+     * Complete an interview owned by {@code userId}.
+     * Rejects non-owners (403), non-IN_PROGRESS (409), and unassigned questionIds (400).
+     */
+    @Transactional
+    public Interview endInterview(UUID interviewId, String userId, List<SubmissionRequest> submissions) {
+        log.info("Ending interview: {} with {} submissions for user {}", interviewId, submissions.size(), userId);
+
+        Interview interview = requireOwnedInterview(interviewId, userId);
+
+        if (interview.getStatus() != Interview.Status.IN_PROGRESS) {
+            throw new ConflictException("This interview can no longer accept submissions.");
+        }
+
+        // Load assigned question IDs inside the same transaction before save
+        Set<UUID> assignedQuestionIds = new HashSet<>(
+                interviewQuestionRepository.findQuestionIdsByInterviewId(interviewId));
+
+        for (SubmissionRequest submissionReq : submissions) {
+            UUID qid = submissionReq.getQuestionId();
+            if (qid == null || !assignedQuestionIds.contains(qid)) {
+                throw new BadRequestException(
+                        "Submission includes a question that is not part of this interview.");
+            }
+        }
 
         interview.setEndedAt(Instant.now());
         interview.setStatus(Interview.Status.COMPLETED);
@@ -113,22 +150,18 @@ public class InterviewService {
         userQuestionSeenService.markQuestionsAsSeen(userId, questionIds, difficulty);
     }
 
-    public Interview getInterviewWithFeedback(UUID interviewId) {
-        return interviewRepository.findById(interviewId)
-                .orElseThrow(() -> ResourceNotFoundException.of("Interview"));
+    public Interview getInterviewWithFeedback(UUID interviewId, String userId) {
+        return requireOwnedInterview(interviewId, userId);
     }
 
-    public List<UserSubmission> getSubmissionsWithFeedback(UUID interviewId) {
+    public List<UserSubmission> getSubmissionsWithFeedback(UUID interviewId, String userId) {
+        requireOwnedInterview(interviewId, userId);
         return userSubmissionRepository.findByInterviewIdWithQuestionOrderBySubmittedAt(interviewId);
     }
 
     public Interview validateInterviewAccess(UUID interviewId, String userId) {
         log.info("Validating interview access: interviewId={}, userId={}", interviewId, userId);
-        Interview interview = interviewRepository.findById(interviewId)
-                .orElseThrow(() -> ResourceNotFoundException.of("Interview"));
-        if (!interview.getUserId().equals(userId)) {
-            throw new ForbiddenException("You do not have access to this interview session.");
-        }
+        Interview interview = requireOwnedInterview(interviewId, userId);
         log.info("Interview access validated successfully for user: {}", userId);
         return interview;
     }

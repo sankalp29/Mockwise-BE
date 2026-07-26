@@ -15,6 +15,18 @@
 	<description>MockWise interview backend API</description>
 	<properties>
 		<java.version>17</java.version>
+		<!-- SonarQube / quality defaults (override with -D or env) -->
+		<sonar.projectKey>mockwise-backend</sonar.projectKey>
+		<sonar.projectName>MockWise Backend</sonar.projectName>
+		<sonar.java.source>${java.version}</sonar.java.source>
+		<sonar.sources>src/main/java</sonar.sources>
+		<sonar.tests>src/test/java</sonar.tests>
+		<sonar.java.binaries>target/classes</sonar.java.binaries>
+		<sonar.java.test.binaries>target/test-classes</sonar.java.test.binaries>
+		<sonar.coverage.jacoco.xmlReportPaths>target/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
+		<checkstyle.version>10.21.2</checkstyle.version>
+		<maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
+		<sonar-maven-plugin.version>5.0.0.4389</sonar-maven-plugin.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -119,6 +131,10 @@
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
 				<configuration>
+					<!-- Default run profile: local laptop DB (mockwise_local). Override with -Dspring-boot.run.profiles=prod -->
+					<profiles>
+						<profile>local</profile>
+					</profiles>
 					<excludes>
 						<exclude>
 							<groupId>org.projectlombok</groupId>
@@ -127,6 +143,59 @@
 					</excludes>
 				</configuration>
 			</plugin>
+			<!-- Checkstyle: not bound to lifecycle — use ./scripts/quality/run-checkstyle.sh or -Pquality -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-checkstyle-plugin</artifactId>
+				<version>${maven-checkstyle-plugin.version}</version>
+				<dependencies>
+					<dependency>
+						<groupId>com.puppycrawl.tools</groupId>
+						<artifactId>checkstyle</artifactId>
+						<version>${checkstyle.version}</version>
+					</dependency>
+				</dependencies>
+				<configuration>
+					<configLocation>config/checkstyle/checkstyle.xml</configLocation>
+					<consoleOutput>true</consoleOutput>
+					<failsOnError>true</failsOnError>
+					<failOnViolation>true</failOnViolation>
+					<violationSeverity>warning</violationSeverity>
+					<linkXRef>false</linkXRef>
+					<includeTestSourceDirectory>true</includeTestSourceDirectory>
+					<outputFile>${project.build.directory}/checkstyle-result.xml</outputFile>
+				</configuration>
+			</plugin>
+			<!-- SonarQube: ./scripts/quality/run-sonar.sh  (or ./mvnw sonar:sonar) -->
+			<plugin>
+				<groupId>org.sonarsource.scanner.maven</groupId>
+				<artifactId>sonar-maven-plugin</artifactId>
+				<version>${sonar-maven-plugin.version}</version>
+			</plugin>
 		</plugins>
 	</build>
+
+	<!-- Optional: bind Checkstyle to validate when running with -Pquality -->
+	<profiles>
+		<profile>
+			<id>quality</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-checkstyle-plugin</artifactId>
+						<executions>
+							<execution>
+								<id>checkstyle-validate</id>
+								<phase>validate</phase>
+								<goals>
+									<goal>check</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
 </project>

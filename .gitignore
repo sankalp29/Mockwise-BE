@@ -24,7 +24,9 @@ build/
 # Runtime / local secrets
 logs/
 *.log
-src/main/resources/application-local.yml
+# Optional machine-only secrets (copy from application-local-secrets.yml.example)
+src/main/resources/application-local-secrets.yml
+# Legacy; do not reintroduce — use YAML profiles (local/prod/test) only
 src/main/resources/application.properties
 
 # OS
@@ -39,3 +41,9 @@ Thumbs.db
 
 # Claude local
 .claude/settings.local.json
+
+# Quality loop artifacts (Sonar / Checkstyle exports)
+.quality/
+
+# Local DB dump scratch (may contain PII)
+.tmp-db-copy/

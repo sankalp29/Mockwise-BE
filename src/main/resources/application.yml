@@ -1,8 +1,31 @@
+# =============================================================================
+# application.yml — SHARED defaults (all environments)
+# =============================================================================
+# Active profile selects environment-specific overrides:
+#   local  → application-local.yml   (laptop / local Postgres)
+#   prod   → application-prod.yml    (deployed / managed Postgres)
+#   test   → src/test/.../application-test.yml  (H2, automatic in tests)
+#
+# Override the default with:
+#   export SPRING_PROFILES_ACTIVE=local   # or prod
+#   ./mvnw clean spring-boot:run
+#
+# After deleting/renaming config files, always `mvn clean` — Maven does not remove
+# orphaned files under target/classes, and a stale application.properties can force
+# an old profile (e.g. dev → database "mockwise").
+# =============================================================================
+
 spring:
   application:
     name: mockwise-backend
   profiles:
-    active: ${SPRING_PROFILES_ACTIVE:dev}
+    # Default for `./mvnw spring-boot:run` with no env set → local machine.
+    active: ${SPRING_PROFILES_ACTIVE:local}
+    # When profile "local" is active, also load optional machine secrets if present.
+    # File: application-local-secrets.yml (gitignored). Missing file is fine.
+    group:
+      local:
+        - local-secrets
   jpa:
     open-in-view: false
     properties:
@@ -15,6 +38,7 @@ spring:
         order_inserts: true
         order_updates: true
   flyway:
+    # Schema is still owned by Hibernate ddl-auto until Flyway is baselined.
     enabled: false
 
 server:
@@ -31,5 +55,3 @@ claude:
 judge0:
   api:
     url: ${JUDGE0_API_URL:https://judge0-ce.p.rapidapi.com}
-
-# Secrets and environment-specific values live in profile files / env vars.

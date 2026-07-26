@@ -45,13 +45,19 @@ Discovery APIs:
 
 ## Config profiles
 
-| Profile | File | Notes |
-|---------|------|-------|
-| default | `application.yml` | Shared non-secret defaults; Flyway off |
-| `dev` | `application-dev.yml` | Local Postgres; `ddl-auto=update` |
-| `prod` | `application-prod.yml` | Secrets via env; `ddl-auto=validate` |
-| `test` | `src/test/resources/application-test.yml` | In-memory H2 |
-| `local` | `application-local.yml` (gitignored) | Optional machine secrets |
+| Profile | File | When |
+|---------|------|------|
+| _(always)_ | `application.yml` | Shared non-secret defaults; default active profile = `local` |
+| **`local`** | `application-local.yml` | Laptop + localhost Postgres (`mockwise_local`); `ddl-auto=update` |
+| **`prod`** | `application-prod.yml` | Deployed environment; secrets from env; `ddl-auto=validate` |
+| **`test`** | `src/test/resources/application-test.yml` | Automated tests (H2); set via `@ActiveProfiles("test")` |
+| _(optional)_ | `application-local-secrets.yml` | Machine-only secrets; gitignored; auto-included with `local` |
+
+There is **no** `dev` profile. Local development uses **`local`** only.
+
+### Naming rule
+
+`application-<profile>.yml` where `<profile>` is exactly the environment: `local` | `prod` | `test`.
 
 ## Schema ownership
 

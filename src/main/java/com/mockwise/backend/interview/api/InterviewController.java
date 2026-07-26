@@ -10,6 +10,7 @@ import com.mockwise.backend.common.exception.ResourceNotFoundException;
 import com.mockwise.backend.common.exception.UnauthorizedException;
 import com.mockwise.backend.common.util.AuthSupport;
 import com.mockwise.backend.interview.api.dto.CheckSyntaxRequest;
+import com.mockwise.backend.interview.api.dto.GenerateFeedbackResponse;
 import com.mockwise.backend.interview.api.dto.StartInterviewRequest;
 import com.mockwise.backend.interview.api.dto.SubmitInterviewRequest;
 import com.mockwise.backend.interview.application.FeedbackService;
@@ -87,17 +88,18 @@ public class InterviewController {
         if (request == null || request.getSubmissions() == null) {
             throw new BadRequestException("Submissions are required.");
         }
-        AuthSupport.requireUser(authentication);
+        SupabaseUser user = AuthSupport.requireUser(authentication);
 
         log.info("Submitting interview: {} with {} submissions", interviewId, request.getSubmissions().size());
 
-        Interview interview = interviewService.endInterview(interviewId, request.getSubmissions());
+        Interview interview = interviewService.endInterview(interviewId, user.getId(), request.getSubmissions());
         List<UUID> questionIds = request.getSubmissions().stream()
                 .map(s -> s.getQuestionId())
                 .toList();
         interviewService.markQuestionsAsSeen(interview.getUserId(), questionIds, interview.getDifficulty());
 
-        feedbackService.generateFeedbackForInterview(interviewId);
+        // Ownership already proven by endInterview; fire async worker only (no re-gate).
+        feedbackService.runFeedbackGeneration(interviewId);
 
         return ResponseEntity.ok(Map.of(
                 "message", "Interview submitted successfully",
@@ -108,9 +110,10 @@ public class InterviewController {
     @GetMapping("/{interviewId}/feedback")
     public ResponseEntity<?> getInterviewFeedback(@PathVariable UUID interviewId,
                                                   Authentication authentication) {
-        AuthSupport.requireUser(authentication);
-        Interview interview = interviewService.getInterviewWithFeedback(interviewId);
-        List<UserSubmission> submissions = interviewService.getSubmissionsWithFeedback(interviewId);
+        SupabaseUser user = AuthSupport.requireUser(authentication);
+        Interview interview = interviewService.getInterviewWithFeedback(interviewId, user.getId());
+        List<UserSubmission> submissions =
+                interviewService.getSubmissionsWithFeedback(interviewId, user.getId());
         return ResponseEntity.ok(Map.of(
                 "interview", interview,
                 "submissions", submissions
@@ -133,14 +136,14 @@ public class InterviewController {
     }
 
     @PostMapping("/{interviewId}/generate-feedback")
-    public ResponseEntity<?> generateFeedback(@PathVariable UUID interviewId,
-                                              Authentication authentication) {
-        AuthSupport.requireUser(authentication);
-        feedbackService.generateFeedbackForInterview(interviewId);
-        return ResponseEntity.ok(Map.of(
-                "status", "started",
-                "message", "Feedback generation has been started."
-        ));
+    public ResponseEntity<GenerateFeedbackResponse> generateFeedback(
+            @PathVariable UUID interviewId,
+            Authentication authentication) {
+        SupabaseUser user = AuthSupport.requireUser(authentication);
+        // Sync gate: 403/400/ALREADY_READY complete on request thread before any @Async work.
+        GenerateFeedbackResponse response =
+                feedbackService.requestFeedbackGeneration(interviewId, user.getId());
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/questions")

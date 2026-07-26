@@ -1,0 +1,74 @@
+# =============================================================================
+# application-local.yml — LOCAL development (your laptop)
+# Profile name: local
+# Activate: default, or SPRING_PROFILES_ACTIVE=local
+# =============================================================================
+# Intent:
+#   - App runs on your machine (./mvnw spring-boot:run)
+#   - Auth + interview data use the Mockwise-Local Supabase project
+#     (configured in application-local-secrets.yml — gitignored)
+#
+# Isolation:
+#   - Local Supabase project  ≠  production Supabase project
+#   - Local DB (Supabase Postgres)  ≠  production DB
+#   - Interviews created locally never appear in production
+#
+# Setup:
+#   1. cp application-local-secrets.yml.example application-local-secrets.yml
+#   2. Fill Supabase Auth keys + Database connection (sslmode=require)
+#   3. ./mvnw clean spring-boot:run
+#
+# Defaults below are safe placeholders; secrets file / env override them.
+# =============================================================================
+
+spring:
+  datasource:
+    # Prefer application-local-secrets.yml for real Supabase Postgres URL.
+    # Fallback: optional env SPRING_DATASOURCE_URL, else laptop Postgres.
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/mockwise_local}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: HikariPool-local
+      # Keep small: Supabase free/pro has low direct connection limits.
+      maximum-pool-size: 5
+      minimum-idle: 1
+      # Do not use 10s/60s — pool churn + flaky network empties the pool (total=0).
+      # Stay under typical Supabase pooler idle (~5m) but avoid thrashing.
+      idle-timeout: 120000
+      max-lifetime: 240000
+      connection-timeout: 20000
+      # Log stacks if a connection is held >20s (real leaks).
+      leak-detection-threshold: 20000
+  jpa:
+    hibernate:
+      # Local schema evolution; prod uses validate.
+      ddl-auto: update
+    show-sql: true
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: false
+
+# Overridden by application-local-secrets.yml for Mockwise-Local project.
+supabase:
+  url: ${SUPABASE_URL:http://localhost}
+  anon:
+    key: ${SUPABASE_ANON_KEY:local-anon-key}
+  service:
+    key: ${SUPABASE_SERVICE_KEY:local-service-key}
+
+claude:
+  api:
+    key: ${CLAUDE_API_KEY:}
+
+judge0:
+  api:
+    key: ${JUDGE0_API_KEY:}
+
+logging:
+  level:
+    root: INFO
+    com.mockwise.backend: INFO
+    com.zaxxer.hikari: INFO
+    org.hibernate.SQL: DEBUG

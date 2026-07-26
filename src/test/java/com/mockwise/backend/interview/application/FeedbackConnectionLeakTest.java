@@ -2,6 +2,7 @@ package com.mockwise.backend.interview.application;
 
 import com.mockwise.backend.evaluation.ClaudeService;
 import com.mockwise.backend.interview.domain.Interview;
+import com.mockwise.backend.interview.infrastructure.InterviewQuestionRepository;
 import com.mockwise.backend.interview.infrastructure.InterviewRepository;
 import com.mockwise.backend.question.domain.Question;
 import com.mockwise.backend.question.infrastructure.QuestionRepository;
@@ -44,6 +45,9 @@ class FeedbackConnectionLeakTest {
     private InterviewRepository interviewRepository;
 
     @Autowired
+    private InterviewQuestionRepository interviewQuestionRepository;
+
+    @Autowired
     private QuestionRepository questionRepository;
 
     @Autowired
@@ -58,6 +62,7 @@ class FeedbackConnectionLeakTest {
     @BeforeEach
     void setUp() {
         userSubmissionRepository.deleteAllInBatch();
+        interviewQuestionRepository.deleteAllInBatch();
         interviewRepository.deleteAllInBatch();
         questionRepository.deleteAllInBatch();
     }
@@ -113,7 +118,7 @@ class FeedbackConnectionLeakTest {
         HikariPoolMXBean poolMxBean = hikariDs.getHikariPoolMXBean();
 
         for (UUID id : interviewIds) {
-            feedbackService.generateFeedbackForInterview(id);
+            feedbackService.runFeedbackGeneration(id);
         }
 
         int totalSubmissions = CONCURRENT_REQUESTS * SUBMISSIONS_PER_INTERVIEW;
