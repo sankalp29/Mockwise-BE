@@ -11,6 +11,7 @@ import com.mockwise.backend.repository.interview.InterviewQuestionRepository;
 import com.mockwise.backend.repository.interview.InterviewRepository;
 import com.mockwise.backend.service.progress.UserQuestionSeenService;
 import com.mockwise.backend.service.question.QuestionSelectionService;
+import com.mockwise.backend.service.session.ActiveSessionGuard;
 import com.mockwise.backend.repository.question.Question;
 import com.mockwise.backend.repository.question.QuestionRepository;
 import com.mockwise.backend.repository.submission.UserSubmission;
@@ -40,10 +41,12 @@ public class InterviewService {
     private final QuestionSelectionService questionSelectionService;
     private final UserQuestionSeenService userQuestionSeenService;
     private final InterviewQuestionRepository interviewQuestionRepository;
+    private final ActiveSessionGuard activeSessionGuard;
 
     @Transactional
     public Interview startInterview(SupabaseUser user, Question.Difficulty difficulty,
                                     Integer numQuestions, Integer timeMinutes) {
+        activeSessionGuard.requireClear(user.getId());
         log.info("Starting interview for user: {} with difficulty: {}, questions: {}, time: {}",
                 user.getEmail(), difficulty, numQuestions, timeMinutes);
 

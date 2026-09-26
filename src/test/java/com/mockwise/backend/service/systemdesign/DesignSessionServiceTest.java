@@ -1,7 +1,9 @@
 package com.mockwise.backend.service.systemdesign;
 
 import com.mockwise.backend.config.SupabaseUser;
+import com.mockwise.backend.exception.ConflictException;
 import com.mockwise.backend.service.dashboard.PracticeLedger;
+import com.mockwise.backend.service.session.ActiveSessionGuard;
 import com.mockwise.backend.repository.systemdesign.DesignBoardRepository;
 import com.mockwise.backend.repository.systemdesign.DesignPrompt;
 import com.mockwise.backend.repository.systemdesign.DesignPromptRepository;
@@ -20,7 +22,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -32,6 +37,7 @@ class DesignSessionServiceTest {
     @Mock private DesignBoardRepository boardRepository;
     @Mock private DesignReviewer reviewer;
     @Mock private PracticeLedger practiceLedger;
+    @Mock private ActiveSessionGuard activeSessionGuard;
     @InjectMocks private DesignSessionService designSessionService;
 
     @Test
@@ -39,8 +45,8 @@ class DesignSessionServiceTest {
         DesignPrompt prompt = new DesignPrompt();
         prompt.setTitle("URL Shortener");
         prompt.setLevel(Level.EASY);
-        when(sessionRepository.findFirstByUserIdAndStatus("guest", SessionStatus.IN_PROGRESS))
-                .thenReturn(Optional.empty());
+        when(sessionRepository.findByUserIdAndStatus("guest", SessionStatus.IN_PROGRESS))
+                .thenReturn(List.of());
         when(promptRepository.findByLevel(Level.EASY)).thenReturn(List.of(prompt));
         when(sessionRepository.save(any())).thenAnswer(invocation -> {
             DesignSession session = invocation.getArgument(0);
@@ -53,6 +59,20 @@ class DesignSessionServiceTest {
         assertEquals(prompt, started.getPrompt());
         assertEquals(SessionStatus.IN_PROGRESS, started.getStatus());
         assertEquals(45, started.getTimeMinutes());
+        verify(activeSessionGuard).requireClear("guest");
+    }
+
+    @Test
+    void startDoesNotCreateASessionWhenAnotherInterviewIsOpen() {
+        when(sessionRepository.findByUserIdAndStatus("guest", SessionStatus.IN_PROGRESS))
+                .thenReturn(List.of());
+        doThrow(new ConflictException(ActiveSessionGuard.ALREADY_IN_PROGRESS))
+                .when(activeSessionGuard).requireClear("guest");
+
+        assertThrows(ConflictException.class, () ->
+                designSessionService.start(new SupabaseUser("guest", "test@mockwise.local", true), Level.EASY, 45));
+
+        verify(sessionRepository, never()).save(any());
     }
 
     @Test

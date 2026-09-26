@@ -2,6 +2,7 @@ package com.mockwise.backend.service.systemdesign;
 
 import com.mockwise.backend.config.SupabaseUser;
 import com.mockwise.backend.service.dashboard.PracticeLedger;
+import com.mockwise.backend.service.session.ActiveSessionGuard;
 import com.mockwise.backend.exception.BadRequestException;
 import com.mockwise.backend.exception.ConflictException;
 import com.mockwise.backend.exception.ForbiddenException;
@@ -33,6 +34,7 @@ public class DesignSessionService {
     private final DesignBoardRepository boardRepository;
     private final DesignReviewer reviewer;
     private final PracticeLedger practiceLedger;
+    private final ActiveSessionGuard activeSessionGuard;
 
     @Transactional
     public DesignSession start(SupabaseUser user, Level level, int minutes) {
@@ -42,17 +44,15 @@ public class DesignSessionService {
         if (minutes <= 0) {
             throw new BadRequestException("Time minutes must be a positive value.");
         }
-        DesignSession open = sessionRepository
-                .findFirstByUserIdAndStatus(user.getId(), SessionStatus.IN_PROGRESS)
-                .orElse(null);
-        if (open != null && stillOpen(open)) {
-            return open;
-        }
-        if (open != null) {
+        for (DesignSession open : sessionRepository.findByUserIdAndStatus(user.getId(), SessionStatus.IN_PROGRESS)) {
+            if (stillOpen(open)) {
+                continue;
+            }
             open.setStatus(SessionStatus.COMPLETED);
             open.setEndedAt(Instant.now());
             sessionRepository.save(open);
         }
+        activeSessionGuard.requireClear(user.getId());
 
         List<DesignPrompt> choices = promptRepository.findByLevel(level);
         if (choices.isEmpty()) {

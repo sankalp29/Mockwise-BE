@@ -9,6 +9,7 @@ import com.mockwise.backend.repository.interview.InterviewQuestionRepository;
 import com.mockwise.backend.repository.interview.InterviewRepository;
 import com.mockwise.backend.service.progress.UserQuestionSeenService;
 import com.mockwise.backend.service.question.QuestionSelectionService;
+import com.mockwise.backend.service.session.ActiveSessionGuard;
 import com.mockwise.backend.repository.question.Question;
 import com.mockwise.backend.repository.question.QuestionRepository;
 import com.mockwise.backend.repository.submission.UserSubmission;
@@ -43,6 +44,7 @@ class InterviewServiceOwnershipTest {
     @Mock private QuestionSelectionService questionSelectionService;
     @Mock private UserQuestionSeenService userQuestionSeenService;
     @Mock private InterviewQuestionRepository interviewQuestionRepository;
+    @Mock private ActiveSessionGuard activeSessionGuard;
 
     @InjectMocks
     private InterviewService interviewService;
