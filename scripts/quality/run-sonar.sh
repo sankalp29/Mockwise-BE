@@ -10,24 +10,34 @@ mkdir -p "${OUT_DIR}"
 
 SONAR_HOST_URL="${SONAR_HOST_URL:-http://127.0.0.1:9000}"
 SONAR_TOKEN="${SONAR_TOKEN:-}"
+SONAR_LOGIN="${SONAR_LOGIN:-admin}"
+SONAR_PASSWORD="${SONAR_PASSWORD:-admin}"
 SONAR_PROJECT_KEY="${SONAR_PROJECT_KEY:-mockwise-backend}"
-# Local default token empty — first-time server uses admin/admin; token preferred.
-AUTH_ARGS=()
-CURL_AUTH=()
-if [[ -n "${SONAR_TOKEN}" ]]; then
-  AUTH_ARGS=(-Dsonar.token="${SONAR_TOKEN}")
-  CURL_AUTH=(-u "${SONAR_TOKEN}:")
-elif [[ -n "${SONAR_LOGIN:-}" && -n "${SONAR_PASSWORD:-}" ]]; then
-  AUTH_ARGS=(-Dsonar.login="${SONAR_LOGIN}" -Dsonar.password="${SONAR_PASSWORD}")
-  CURL_AUTH=(-u "${SONAR_LOGIN}:${SONAR_PASSWORD}")
-else
-  # Fresh local SonarQube default (change after first login)
-  AUTH_ARGS=(-Dsonar.login=admin -Dsonar.password=admin)
-  CURL_AUTH=(-u "admin:admin")
-fi
+TOKEN_FILE="${OUT_DIR}/sonar.token"
 
 echo "==> Ensuring SonarQube is ready"
 "${ROOT}/scripts/quality/ensure-sonar.sh"
+
+# SonarQube 26 rejects sonar.login for the scanner. Analysis must send sonar.token.
+if [[ -z "${SONAR_TOKEN}" && -f "${TOKEN_FILE}" ]]; then
+  SONAR_TOKEN="$(tr -d '[:space:]' < "${TOKEN_FILE}")"
+fi
+if [[ -z "${SONAR_TOKEN}" ]]; then
+  echo "==> Creating a local SonarQube user token"
+  token_json="$(curl -sf -u "${SONAR_LOGIN}:${SONAR_PASSWORD}" -X POST \
+    "${SONAR_HOST_URL}/api/user_tokens/generate" \
+    --data-urlencode "name=mockwise-maven-$(date +%s)")" || {
+    echo "ERROR: Could not create a SonarQube token with ${SONAR_LOGIN}." >&2
+    echo "Create one in the UI and export SONAR_TOKEN." >&2
+    exit 1
+  }
+  SONAR_TOKEN="$(printf '%s' "${token_json}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')"
+  umask 077
+  printf '%s\n' "${SONAR_TOKEN}" > "${TOKEN_FILE}"
+  echo "==> Saved token to ${TOKEN_FILE}"
+fi
+AUTH_ARGS=(-Dsonar.token="${SONAR_TOKEN}")
+CURL_AUTH=(-u "${SONAR_TOKEN}:")
 
 echo "==> Compiling sources for analysis"
 ./mvnw -q -DskipTests compile test-compile
@@ -59,10 +69,10 @@ if [[ -z "${REPORT_TASK}" || ! -f "${REPORT_TASK}" ]]; then
   exit 1
 fi
 
-# shellcheck disable=SC1090
-source <(grep -E '^(ceTaskId|serverUrl|dashboardUrl)=' "${REPORT_TASK}" | sed 's/^/export /')
-CE_TASK_ID="${ceTaskId:-}"
-SERVER_URL="${serverUrl:-${SONAR_HOST_URL}}"
+# macOS bash cannot source a process substitution, and the task id contains hyphens.
+CE_TASK_ID="$(grep '^ceTaskId=' "${REPORT_TASK}" | cut -d= -f2- | tr -d '[:space:]')"
+SERVER_URL="$(grep '^serverUrl=' "${REPORT_TASK}" | cut -d= -f2- | tr -d '[:space:]')"
+SERVER_URL="${SERVER_URL:-${SONAR_HOST_URL}}"
 
 if [[ -z "${CE_TASK_ID}" ]]; then
   echo "ERROR: ceTaskId missing in ${REPORT_TASK}" >&2
