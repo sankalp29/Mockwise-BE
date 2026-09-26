@@ -2,46 +2,50 @@
 
 ## Package map (`com.mockwise.backend`)
 
+The layout and the rules for changing it live in [CLAUDE.md](../CLAUDE.md). Summary:
+
 | Package | Responsibility |
 |---------|----------------|
-| `auth` | Supabase JWT filter, security config, WebClient beans, `SupabaseUser` |
-| `interview` | Interview lifecycle API, DTOs, domain, application services, repos |
-| `question` | Questions, code stubs, optimal solutions, selection |
-| `submission` | User submission entity + repository |
-| `dashboard` | Metrics/progress API, aggregates, rating extraction |
-| `progress` | User-question-seen tracking |
-| `evaluation` | Claude / Anthropic feedback integration |
-| `codesyntax` | Syntax check via Strategy + Registry + Facade (Java / Python / C++ today) |
+| `controller/<feature>` | REST controllers and request/response DTOs. No repositories. |
+| `service/<feature>` | Use cases. Interview lifecycle, feedback, questions, dashboard, syntax check, Claude. |
+| `repository/<feature>` | JPA entities and Spring Data repositories for that feature. |
+| `config` | Security filter, Supabase clients, async executor, auth helpers. |
+| `exception` | API error types and `GlobalExceptionHandler`. |
 
-### `codesyntax` layout (Step 1 multi-language foundation)
+Features: `interview`, `question`, `submission`, `dashboard`, `progress`, `evaluation`, `codesyntax`, `auth`.
 
-```
-codesyntax/
+### `codesyntax` layout
+
+Lives under `service/codesyntax/`. The HTTP entry is `controller/codesyntax/CodeSyntaxController`.
+
+```text
+service/codesyntax/
   LanguageToolchain.java          # Strategy interface
   LanguageToolchainRegistry.java  # alias-aware lookup
   SyntaxCheckFacade.java          # workspace + dispatch
-  SyntaxCheckService.java         # API-compatible List<String> adapter
+  SyntaxCheckService.java         # API-compatible adapter
   model/ SyntaxCheckResult, ToolStatus
   support/ ProcessRunner, TempWorkspace
-  languages/ JavaToolchain, PythonToolchain, CppToolchain
+  languages/ one toolchain class per language
 ```
 
-Add a new language by implementing `LanguageToolchain` as a `@Component` (Open/Closed).
+Add a new language by implementing `LanguageToolchain` as a `@Component`.
 
 Supported language ids: `java`, `python`, `cpp`, `javascript`, `typescript`, `go`, `rust`, `ruby`, `scala`, `csharp`.
 
-Discovery APIs:
-- `GET /api/interview/supported-languages`
-- `GET /api/codesyntax/languages`
+Discovery API:
 
-| `common` | Shared exception handling, auth helpers |
+- `GET /api/codesyntax/languages`
 
 ### Layers inside features
 
-- `api` — REST controllers + `dto`
-- `domain` — JPA entities
-- `application` — services / use cases
-- `infrastructure` — Spring Data repositories
+Code is grouped by role first, then by feature. Do not add a new `api` / `domain` / `application` / `infrastructure` tree.
+
+- `controller/<feature>` — REST controllers + `dto`. Maps JSON to and from service types.
+- `service/<feature>` — use cases and the types those use cases accept and return.
+- `repository/<feature>` — JPA entities and Spring Data repositories.
+
+Dependency direction and the mapping rules are in [CLAUDE.md](../CLAUDE.md). A service does not import `controller`. A repository does not import `service` or `controller`.
 
 ## Config profiles
 

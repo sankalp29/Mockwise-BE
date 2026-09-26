@@ -78,18 +78,6 @@ curl -sS -w "\nHTTP %{http_code}\n" \
   http://127.0.0.1:8080/api/interview/4044e4bc-ea11-42ce-9b0b-2eae8d2f1253/feedback
 ```
 
-### `POST /api/interview/check-syntax`
-
-```bash
-curl -sS -w "\nHTTP %{http_code}\n" \
-  -X POST http://127.0.0.1:8080/api/interview/check-syntax \
-  -H "Authorization: Bearer eyJhbGciOiAibm9uZSIsICJ0eXAiOiAiSldUIn0.eyJzdWIiOiAibG9jYWwtdXNlci0wMDEiLCAiZW1haWwiOiAibG9jYWxAdGVzdC5jb20ifQ.bG9jYWw" \
-  -H "Content-Type: application/json" \
-  -d '{"language":"java","code":"public int add(int a, int b) { return a + b; }"}'
-```
-
-Supported languages: `java`, `python`, `cpp`.
-
 ### `GET /api/interview/ongoing`
 
 ```bash
@@ -104,30 +92,6 @@ curl -sS -w "\nHTTP %{http_code}\n" \
 curl -sS -w "\nHTTP %{http_code}\n" \
   -H "Authorization: Bearer eyJhbGciOiAibm9uZSIsICJ0eXAiOiAiSldUIn0.eyJzdWIiOiAibG9jYWwtdXNlci0wMDEiLCAiZW1haWwiOiAibG9jYWxAdGVzdC5jb20ifQ.bG9jYWw" \
   http://127.0.0.1:8080/api/interview/b42ad138-7d9a-4a63-8338-a8a710eb0f2e/validate
-```
-
-### `GET /api/interview/questions`
-
-```bash
-curl -sS -w "\nHTTP %{http_code}\n" \
-  -H "Authorization: Bearer eyJhbGciOiAibm9uZSIsICJ0eXAiOiAiSldUIn0.eyJzdWIiOiAibG9jYWwtdXNlci0wMDEiLCAiZW1haWwiOiAibG9jYWxAdGVzdC5jb20ifQ.bG9jYWw" \
-  "http://127.0.0.1:8080/api/interview/questions?difficulty=EASY&count=3"
-```
-
-### `GET /api/interview/questions/{questionId}/stub`
-
-```bash
-curl -sS -w "\nHTTP %{http_code}\n" \
-  -H "Authorization: Bearer eyJhbGciOiAibm9uZSIsICJ0eXAiOiAiSldUIn0.eyJzdWIiOiAibG9jYWwtdXNlci0wMDEiLCAiZW1haWwiOiAibG9jYWxAdGVzdC5jb20ifQ.bG9jYWw" \
-  "http://127.0.0.1:8080/api/interview/questions/05564f0b-97b5-4aff-8686-7ef5450aec4e/stub?language=java"
-```
-
-### `GET /api/interview/optimal-code`
-
-```bash
-curl -sS -w "\nHTTP %{http_code}\n" \
-  -H "Authorization: Bearer eyJhbGciOiAibm9uZSIsICJ0eXAiOiAiSldUIn0.eyJzdWIiOiAibG9jYWwtdXNlci0wMDEiLCAiZW1haWwiOiAibG9jYWxAdGVzdC5jb20ifQ.bG9jYWw" \
-  "http://127.0.0.1:8080/api/interview/optimal-code?questionId=05564f0b-97b5-4aff-8686-7ef5450aec4e&language=java"
 ```
 
 ### `POST /api/interview/{interviewId}/generate-feedback`
@@ -171,10 +135,11 @@ curl -sS -w "\nHTTP %{http_code}\n" \
 | POST | `/api/interview/{interviewId}/generate-feedback` | Yes |
 | GET | `/api/interview/{interviewId}/validate` | Yes |
 | GET | `/api/interview/ongoing` | Yes |
-| GET | `/api/interview/questions` | Yes |
-| GET | `/api/interview/questions/{questionId}/stub` | Yes |
-| GET | `/api/interview/optimal-code` | Yes |
-| POST | `/api/interview/check-syntax` | Yes |
+| GET | `/api/questions/{questionId}` | Yes |
+| GET | `/api/questions/{questionId}/stub` | Yes |
+| GET | `/api/questions/{questionId}/optimal-code` | Yes |
+| GET | `/api/codesyntax/languages` | Yes |
+| POST | `/api/codesyntax/check` | Yes |
 | GET | `/api/dashboard/metrics` | Yes |
 | GET | `/api/dashboard/progress` | Yes |
 
@@ -196,15 +161,35 @@ export SPRING_PROFILES_ACTIVE=local
 
 ---
 
-## Supported languages (syntax check)
+## Questions
 
-### `GET /api/interview/supported-languages`
+A question is its own resource. The client loads it during an interview and again from feedback, including the stub and the optimal solution.
+
+### `GET /api/questions/{questionId}`
 
 ```bash
 curl -sS -w "\nHTTP %{http_code}\n" \
   -H "Authorization: Bearer eyJhbGciOiAibm9uZSIsICJ0eXAiOiAiSldUIn0.eyJzdWIiOiAibG9jYWwtdXNlci0wMDEiLCAiZW1haWwiOiAibG9jYWxAdGVzdC5jb20ifQ.bG9jYWw" \
-  http://127.0.0.1:8080/api/interview/supported-languages
+  http://127.0.0.1:8080/api/questions/05564f0b-97b5-4aff-8686-7ef5450aec4e
 ```
+
+### `GET /api/questions/{questionId}/stub`
+
+```bash
+curl -sS -w "\nHTTP %{http_code}\n" \
+  -H "Authorization: Bearer eyJhbGciOiAibm9uZSIsICJ0eXAiOiAiSldUIn0.eyJzdWIiOiAibG9jYWwtdXNlci0wMDEiLCAiZW1haWwiOiAibG9jYWxAdGVzdC5jb20ifQ.bG9jYWw" \
+  "http://127.0.0.1:8080/api/questions/05564f0b-97b5-4aff-8686-7ef5450aec4e/stub?language=java"
+```
+
+### `GET /api/questions/{questionId}/optimal-code`
+
+```bash
+curl -sS -w "\nHTTP %{http_code}\n" \
+  -H "Authorization: Bearer eyJhbGciOiAibm9uZSIsICJ0eXAiOiAiSldUIn0.eyJzdWIiOiAibG9jYWwtdXNlci0wMDEiLCAiZW1haWwiOiAibG9jYWxAdGVzdC5jb20ifQ.bG9jYWw" \
+  "http://127.0.0.1:8080/api/questions/05564f0b-97b5-4aff-8686-7ef5450aec4e/optimal-code?language=java"
+```
+
+## Syntax check
 
 ### `GET /api/codesyntax/languages`
 

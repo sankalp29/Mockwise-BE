@@ -72,3 +72,8 @@ logging:
     com.mockwise.backend: INFO
     com.zaxxer.hikari: INFO
     org.hibernate.SQL: DEBUG
+
+# Skip Supabase JWT locally. Set false (or MOCKWISE_AUTH_DISABLED=false) to restore login.
+mockwise:
+  auth:
+    disabled: true

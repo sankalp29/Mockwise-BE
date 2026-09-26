@@ -74,7 +74,9 @@ Claude returns a structured JSON with:
 - `POST /api/interview/start`: Start new interview
 - `POST /api/interview/{id}/submit`: Submit interview with code solutions
 - `GET /api/interview/{id}/feedback`: Retrieve interview feedback
-- `GET /api/interview/questions`: Get random questions by difficulty
+- `GET /api/questions/{questionId}`: Load one question
+- `GET /api/questions/{questionId}/stub`: Code stub for a language
+- `GET /api/questions/{questionId}/optimal-code`: Reference solution for a language
 
 ## Database Changes
 
@@ -107,4 +109,4 @@ logging.level.com.mockwise.mockwise_backend.interview.ClaudeService=DEBUG
 ## Security Notes
 - API keys are loaded from environment variables
 - CORS is configured for your frontend domain
-- Authentication required for all interview endpoints (except `/questions`)
+- Authentication required for interview, question, and syntax endpoints

@@ -1,0 +1,605 @@
+{
+  "openapi" : "3.1.0",
+  "info" : {
+    "title" : "MockWise API",
+    "description" : "Interview, question, dashboard, and syntax-check API.",
+    "version" : "0.0.1"
+  },
+  "servers" : [ {
+    "url" : "http://localhost",
+    "description" : "Generated server url"
+  } ],
+  "security" : [ {
+    "bearerAuth" : [ ]
+  } ],
+  "paths" : {
+    "/api/interview/{interviewId}/submit" : {
+      "post" : {
+        "tags" : [ "interview-controller" ],
+        "operationId" : "submitInterview",
+        "parameters" : [ {
+          "name" : "interviewId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SubmitInterviewRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object",
+                  "additionalProperties" : { }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/interview/{interviewId}/generate-feedback" : {
+      "post" : {
+        "tags" : [ "interview-controller" ],
+        "operationId" : "generateFeedback",
+        "parameters" : [ {
+          "name" : "interviewId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/GenerateFeedbackResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/interview/start" : {
+      "post" : {
+        "tags" : [ "interview-controller" ],
+        "operationId" : "startInterview",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/StartInterviewRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/codesyntax/check" : {
+      "post" : {
+        "tags" : [ "code-syntax-controller" ],
+        "operationId" : "check",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "additionalProperties" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object",
+                  "additionalProperties" : { }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/questions" : {
+      "post" : {
+        "tags" : [ "admin-question-controller" ],
+        "operationId" : "create",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateQuestionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/QuestionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/account" : {
+      "post" : {
+        "tags" : [ "account-controller" ],
+        "operationId" : "ensure",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/questions/{questionId}" : {
+      "get" : {
+        "tags" : [ "question-controller" ],
+        "operationId" : "getQuestion",
+        "parameters" : [ {
+          "name" : "questionId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/QuestionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/questions/{questionId}/stub" : {
+      "get" : {
+        "tags" : [ "question-controller" ],
+        "operationId" : "getCodeStub",
+        "parameters" : [ {
+          "name" : "questionId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "language",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/questions/{questionId}/optimal-code" : {
+      "get" : {
+        "tags" : [ "question-controller" ],
+        "operationId" : "getOptimalCode",
+        "parameters" : [ {
+          "name" : "questionId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "language",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/interview/{interviewId}/validate" : {
+      "get" : {
+        "tags" : [ "interview-controller" ],
+        "operationId" : "validateInterviewSession",
+        "parameters" : [ {
+          "name" : "interviewId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/interview/{interviewId}/feedback" : {
+      "get" : {
+        "tags" : [ "interview-controller" ],
+        "operationId" : "getInterviewFeedback",
+        "parameters" : [ {
+          "name" : "interviewId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/interview/test-auth" : {
+      "get" : {
+        "tags" : [ "interview-controller" ],
+        "operationId" : "testAuth",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/interview/ongoing" : {
+      "get" : {
+        "tags" : [ "interview-controller" ],
+        "operationId" : "getOngoingInterview",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dashboard/progress" : {
+      "get" : {
+        "tags" : [ "dashboard-controller" ],
+        "operationId" : "getProgress",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dashboard/metrics" : {
+      "get" : {
+        "tags" : [ "dashboard-controller" ],
+        "operationId" : "getDashboardData",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/codesyntax/languages" : {
+      "get" : {
+        "tags" : [ "code-syntax-controller" ],
+        "operationId" : "languages",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/SupportedLanguage"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components" : {
+    "schemas" : {
+      "SubmissionRequest" : {
+        "type" : "object",
+        "properties" : {
+          "questionId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "code" : {
+            "type" : "string"
+          },
+          "language" : {
+            "type" : "string"
+          },
+          "timeComplexity" : {
+            "type" : "string"
+          },
+          "spaceComplexity" : {
+            "type" : "string"
+          }
+        }
+      },
+      "SubmitInterviewRequest" : {
+        "type" : "object",
+        "properties" : {
+          "submissions" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/SubmissionRequest"
+            }
+          }
+        }
+      },
+      "GenerateFeedbackResponse" : {
+        "type" : "object",
+        "properties" : {
+          "interviewId" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "statusCode" : {
+            "type" : "string"
+          },
+          "message" : {
+            "type" : "string"
+          }
+        }
+      },
+      "StartInterviewRequest" : {
+        "type" : "object",
+        "properties" : {
+          "difficulty" : {
+            "type" : "string",
+            "enum" : [ "EASY", "MEDIUM", "HARD" ]
+          },
+          "numQuestions" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "timeMinutes" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "CreateQuestionRequest" : {
+        "type" : "object",
+        "properties" : {
+          "title" : {
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "example" : {
+            "type" : "string"
+          },
+          "constraints" : {
+            "type" : "string"
+          },
+          "difficulty" : {
+            "type" : "string"
+          },
+          "stubs" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/LanguageCode"
+            }
+          },
+          "optimalSolutions" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/LanguageCode"
+            }
+          }
+        }
+      },
+      "LanguageCode" : {
+        "type" : "object",
+        "properties" : {
+          "language" : {
+            "type" : "string"
+          },
+          "code" : {
+            "type" : "string"
+          }
+        }
+      },
+      "QuestionResponse" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "example" : {
+            "type" : "string"
+          },
+          "constraints" : {
+            "type" : "string"
+          },
+          "difficulty" : {
+            "type" : "string",
+            "enum" : [ "EASY", "MEDIUM", "HARD" ]
+          }
+        }
+      },
+      "SupportedLanguage" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "displayName" : {
+            "type" : "string"
+          },
+          "aliases" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "syntaxCheckAvailable" : {
+            "type" : "boolean"
+          }
+        }
+      }
+    },
+    "securitySchemes" : {
+      "bearerAuth" : {
+        "type" : "http",
+        "name" : "bearerAuth",
+        "scheme" : "bearer",
+        "bearerFormat" : "JWT"
+      }
+    }
+  }
+}

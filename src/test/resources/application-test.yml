@@ -41,6 +41,10 @@ judge0:
   api:
     key: test-key
 
+mockwise:
+  auth:
+    disabled: false
+
 logging:
   level:
     root: WARN

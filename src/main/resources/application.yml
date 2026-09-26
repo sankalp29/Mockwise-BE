@@ -41,8 +41,19 @@ spring:
     # Schema is still owned by Hibernate ddl-auto until Flyway is baselined.
     enabled: false
 
+# Set true to skip Supabase JWT auth (local guest user). Restore with false.
+mockwise:
+  auth:
+    disabled: ${MOCKWISE_AUTH_DISABLED:false}
+
 server:
   port: ${PORT:8080}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
 
 app:
   base-url: ${APP_BASE_URL:http://localhost:8080}
