@@ -36,6 +36,7 @@ public class SecurityConfig {
     }
 
     @Bean
+    @SuppressWarnings("java:S4502") // Stateless API. Callers authenticate with a bearer token, not a cookie.
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
