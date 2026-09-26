@@ -1,6 +1,7 @@
 package com.mockwise.backend.service.dashboard;
 
 import com.mockwise.backend.repository.dashboard.DashboardAggregate;
+import com.mockwise.backend.repository.question.Difficulty;
 import com.mockwise.backend.repository.dashboard.DashboardAggregateRepository;
 import com.mockwise.backend.repository.dashboard.Practice;
 import com.mockwise.backend.repository.dashboard.PracticeResult;
@@ -98,7 +99,7 @@ public class DashboardService {
             point.put("date", result.getStartedAt() != null ? dateFormat.format(result.getStartedAt()) : "");
             point.put("overallRating", result.getOverallRating());
             point.put("numQuestions", result.getQuestionCount());
-            point.put("difficulty", titleCase(result.getDifficulty()));
+            point.put("difficulty", result.getDifficulty().label());
             point.put("timeMinutes", result.getTimeMinutes());
             series.add(point);
         }
@@ -121,8 +122,7 @@ public class DashboardService {
             point.put("date", interview.getStartedAt() != null ? dateFormat.format(interview.getStartedAt()) : "");
             point.put("overallRating", overallRating);
             point.put("numQuestions", interview.getNumQuestions());
-            point.put("difficulty", interview.getDifficulty().name().substring(0, 1)
-                    + interview.getDifficulty().name().substring(1).toLowerCase());
+            point.put("difficulty", interview.getDifficulty().label());
             point.put("timeMinutes", interview.getTimeMinutes() != null
                     ? interview.getTimeMinutes()
                     : (int) durationMinutes);
@@ -228,9 +228,9 @@ public class DashboardService {
                 .max(Instant::compareTo).orElse(null);
 
         Map<String, Double> scoreByDifficulty = new LinkedHashMap<>();
-        scoreByDifficulty.put("Easy", averageFor(rows, "EASY"));
-        scoreByDifficulty.put("Medium", averageFor(rows, "MEDIUM"));
-        scoreByDifficulty.put("Hard", averageFor(rows, "HARD"));
+        for (Difficulty difficulty : Difficulty.values()) {
+            scoreByDifficulty.put(difficulty.label(), averageFor(rows, difficulty));
+        }
 
         String lastMockDate = "";
         if (last != null) {
@@ -251,23 +251,15 @@ public class DashboardService {
         return metrics;
     }
 
-    private static double averageFor(List<PracticeResult> rows, String difficulty) {
+    private static double averageFor(List<PracticeResult> rows, Difficulty difficulty) {
         double sum = 0;
         int count = 0;
         for (PracticeResult row : rows) {
-            if (difficulty.equalsIgnoreCase(row.getDifficulty())) {
+            if (row.getDifficulty() == difficulty) {
                 sum += row.getOverallRating();
                 count++;
             }
         }
         return roundedAverage(sum, count);
-    }
-
-    private static String titleCase(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return "";
-        }
-        String lower = raw.toLowerCase();
-        return Character.toUpperCase(lower.charAt(0)) + lower.substring(1);
     }
 }

@@ -1,5 +1,6 @@
 package com.mockwise.backend.repository.interview;
 
+import com.mockwise.backend.repository.question.Difficulty;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.mockwise.backend.repository.question.Question;
 import com.mockwise.backend.repository.submission.UserSubmission;
@@ -33,7 +34,7 @@ public class Interview {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private Question.Difficulty difficulty;
+    private Difficulty difficulty;
 
     @Column(name = "num_questions", nullable = false)
     private Integer numQuestions;

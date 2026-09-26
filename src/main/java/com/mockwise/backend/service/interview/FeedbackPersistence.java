@@ -38,7 +38,7 @@ public class FeedbackPersistence {
     public record SubmissionPromptData(
             UUID submissionId,
             String code,
-            String language,
+            com.mockwise.backend.repository.question.ProgrammingLanguage language,
             String userTimeComplexity,
             String userSpaceComplexity,
             String problemStatement

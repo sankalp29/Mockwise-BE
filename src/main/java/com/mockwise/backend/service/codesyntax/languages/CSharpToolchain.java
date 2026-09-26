@@ -1,5 +1,6 @@
 package com.mockwise.backend.service.codesyntax.languages;
 
+import com.mockwise.backend.repository.question.ProgrammingLanguage;
 import com.mockwise.backend.service.codesyntax.LanguageToolchain;
 import com.mockwise.backend.service.codesyntax.model.SyntaxCheckResult;
 import com.mockwise.backend.service.codesyntax.support.CommandProbe;
@@ -13,7 +14,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 @Component
@@ -27,18 +27,8 @@ public class CSharpToolchain implements LanguageToolchain {
     }
 
     @Override
-    public String languageId() {
-        return "csharp";
-    }
-
-    @Override
-    public String displayName() {
-        return "C#";
-    }
-
-    @Override
-    public Set<String> aliases() {
-        return Set.of("cs", "c#");
+    public ProgrammingLanguage language() {
+        return ProgrammingLanguage.CSHARP;
     }
 
     @Override

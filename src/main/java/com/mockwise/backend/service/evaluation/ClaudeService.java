@@ -1,36 +1,49 @@
 package com.mockwise.backend.service.evaluation;
 
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.anthropic.client.AnthropicClient;
+import com.anthropic.client.okhttp.AnthropicOkHttpClient;
+import com.anthropic.models.beta.messages.MessageCreateParams;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
 
-import com.anthropic.client.okhttp.AnthropicOkHttpClient;
-import com.anthropic.client.AnthropicClient;
-import com.anthropic.models.beta.messages.MessageCreateParams;
-
+/**
+ * Anthropic transport. Interview styles pass an {@link EvaluationSpec};
+ * this class does not know which style it is calling for.
+ */
 @Service
 public class ClaudeService {
+
     private static final Logger log = LoggerFactory.getLogger(ClaudeService.class);
-    
+    private static final String DEFAULT_MODEL = "claude-sonnet-4-20250514";
+    private static final long DEFAULT_MAX_TOKENS = 1500L;
+
     private final ObjectMapper objectMapper;
     private AnthropicClient anthropicClient;
 
     @Value("${claude.api.key:}")
     private String claudeApiKey;
 
+    @Value("${claude.model:claude-sonnet-4-20250514}")
+    private String model;
+
+    @Value("${claude.max-tokens:1500}")
+    private long maxTokens;
+
     public ClaudeService(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
-    
-    @jakarta.annotation.PostConstruct
+
+    @PostConstruct
     public void initAnthropicClient() {
         String apiKey = (claudeApiKey != null && !claudeApiKey.isBlank())
                 ? claudeApiKey
                 : System.getenv("ANTHROPIC_API_KEY");
-        
+
         try {
             if (apiKey == null || apiKey.isBlank()) {
                 log.error("Anthropic API key is not configured. Set 'claude.api.key' or ANTHROPIC_API_KEY env var.");
@@ -40,7 +53,7 @@ public class ClaudeService {
             this.anthropicClient = AnthropicOkHttpClient.builder()
                     .apiKey(apiKey)
                     .build();
-            
+
             log.info("Anthropic Client initialized successfully");
         } catch (Exception e) {
             log.error("Failed to initialize Anthropic client: ", e);
@@ -50,124 +63,44 @@ public class ClaudeService {
 
     /**
      * Blocking Claude call. Must never run inside an open DB transaction.
-     * Call from async workers only, not from request threads that hold pool connections.
+     * Call from async workers or from a service method that is not transactional.
      */
-    public String callClaude(String prompt) {
-        log.info("ClaudeService.callClaude called");
+    public String complete(EvaluationSpec evaluation) {
+        log.info("ClaudeService.complete called for {}", evaluation.getClass().getSimpleName());
 
         if (anthropicClient == null) {
-            log.warn("Anthropic client is null, returning fallback");
-            return createFallbackResponse("Anthropic client not initialized");
+            log.warn("Anthropic client is null, returning evaluation fallback");
+            return evaluation.fallback("Anthropic client not initialized");
         }
 
         try {
             var messages = anthropicClient.beta().messages();
             MessageCreateParams params = MessageCreateParams.builder()
-                    .model("claude-sonnet-4-20250514")
-                    .maxTokens(1500L)
-                    .addUserMessage(prompt)
+                    .model(resolvedModel())
+                    .maxTokens(resolvedMaxTokens())
+                    .addUserMessage(evaluation.prompt())
                     .build();
 
             Object response = messages.create(params);
             String serialized = objectMapper.writeValueAsString(response);
-            return extractContentFromResponse(serialized);
+            return extractContentFromResponse(serialized, evaluation);
         } catch (Exception e) {
             log.error("Error calling Anthropic SDK: {} - {}", e.getClass().getSimpleName(), String.valueOf(e.getMessage()));
-            return createFallbackResponse("Claude API call failed: " + e.getMessage());
+            return evaluation.fallback("Claude API call failed: " + e.getMessage());
         }
     }
 
-    // Helper: Generate prompt for code feedback evaluation (includes optional user self-assessment)
-    public String buildCodeFeedbackPrompt(String problemStatement, String userCode, String language,
-                                      String userTimeComplexity, String userSpaceComplexity) {
-        String selfTime = (userTimeComplexity == null || userTimeComplexity.isBlank()) ? "Not provided" : userTimeComplexity;
-        String selfSpace = (userSpaceComplexity == null || userSpaceComplexity.isBlank()) ? "Not provided" : userSpaceComplexity;
-
-        return String.format("""
-            Evaluate this coding problem and solution for correctness, optimality, time & space complexity, clarity, and provide overall feedback + rating out of 10.
-
-            **Problem**:  
-            %s
-
-            **User Code (%s)**:  
-            %s
-
-            **Self-Assessed Complexity**:  
-            Time: %s  
-            Space: %s
-
-            ======== RULES ========
-
-            Stub Rule (Overrides All):  
-            If code is stub/empty/unimplemented:
-            - All scores = 0  
-            - All feedback = "No meaningful implementation provided."  
-            - Do not infer complexity.  
-
-            Correctness:  
-            - Must work for all valid + edge inputs.  
-            - Brute-force but correct is acceptable.  
-            - Incorrect = all other scores 0.  
-            Scoring:  
-            - 8–10: Fully correct  
-            - 6–7: Minor edge issues  
-            - 4–5: Partially correct  
-            - ≤3: Fails most cases  
-
-            Optimality (0.75 weight):  
-            Only if correct.  
-            - Brute force = low score.  
-            Scoring:  
-            - 8–10: Fully optimal  
-            - 6–7: Efficient, not best  
-            - 4–5: Clearly inefficient  
-            - ≤3: Very poor  
-
-            Time Complexity (0.10 weight) & Space Complexity (0.10 weight):  
-            Compare user's self-assessed complexity with actual Big O of the code.
-            Do not penalize based on algorithm efficiency or optimality.
-            Scoring:
-            - 10: Correct (notation / standard format differences are acceptable)
-            - 7-9: Essentially correct (notation / standard format differences are acceptable)
-            - 0: Incorrect or missing
-
-            In feedback, always state:
-            - Actual Big O: ...
-            - User stated: ...
-            - Match: Yes/No (with explanation if incorrect)  
-
-            Code Clarity (0.05 weight):  
-            - Score based on naming, structure, readability, modularity.  
-            - No penalty for missing comments.  
-
-            Strengths: real positives only  
-            Improvements: actionable issues only (correctness > efficiency > clarity)
-
-            Overall Rating (0–10):  
-            Weighted avg: (optimality_score * 0.75) + (timeComplexity_score * 0.10) + (spaceComplexity_score * 0.10) + (clarity_score * 0.05)
-            Round it to nearest integer.
-
-            Return ONLY this JSON:
-
-            {
-            "correctness": {"score": 0-10, "feedback": "..."},
-            "optimality": {"score": 0-10, "feedback": "..."},
-            "timeComplexity": {"score": 0-10, "feedback": "...", "bigO": "..."},
-            "spaceComplexity": {"score": 0-10, "feedback": "...", "bigO": "..."},
-            "clarity": {"score": 0-10, "feedback": "..."},
-            "overallRating": 0-10,
-            "overallFeedback": "...",
-            "strengths": ["..."],
-            "improvements": ["..."]
-            }
-            """, problemStatement, language, userCode, selfTime, selfSpace);
+    private String resolvedModel() {
+        return model == null || model.isBlank() ? DEFAULT_MODEL : model;
     }
 
-    
-    private String extractContentFromResponse(String response) {
+    private long resolvedMaxTokens() {
+        return maxTokens > 0 ? maxTokens : DEFAULT_MAX_TOKENS;
+    }
+
+    private String extractContentFromResponse(String response, EvaluationSpec evaluation) {
         try {
             JsonNode root = objectMapper.readTree(response);
-            // New Messages API returns content array with text blocks
             JsonNode content = root.get("content");
             if (content != null && content.isArray() && content.size() > 0) {
                 JsonNode first = content.get(0);
@@ -178,41 +111,44 @@ public class ClaudeService {
                     if (normalized != null) {
                         return normalized;
                     }
-                    log.warn("Claude text did not contain valid JSON; returning fallback. Text: {}", text);
-                    return createFallbackResponse("Claude returned non-JSON response");
+                    log.warn("Claude text did not contain valid JSON; returning evaluation fallback");
+                    return evaluation.fallback("Claude returned non-JSON response");
                 }
             }
-            log.warn("Unexpected Anthropic SDK response: {}", response);
-            return createFallbackResponse("Unable to parse Claude response");
+            log.warn("Unexpected Anthropic SDK response shape");
+            return evaluation.fallback("Unable to parse Claude response");
         } catch (Exception e) {
             log.error("Error parsing Claude response: ", e);
-            return createFallbackResponse("Error parsing Claude response: " + e.getMessage());
+            return evaluation.fallback("Error parsing Claude response: " + e.getMessage());
         }
     }
 
-    // Attempts to extract and normalize a JSON object from arbitrary text
     private String coerceToJson(String text) {
-        if (text == null) return null;
-        // Try direct parse
-        try {
-            JsonNode n = objectMapper.readTree(text);
-            return objectMapper.writeValueAsString(n);
-        } catch (Exception ignore) {
+        if (text == null) {
+            return null;
         }
-        // Extract first balanced JSON object
+        try {
+            JsonNode parsed = objectMapper.readTree(text);
+            return objectMapper.writeValueAsString(parsed);
+        } catch (Exception ignore) {
+            // fall through to a balanced-object scan
+        }
         int start = text.indexOf('{');
-        if (start < 0) return null;
+        if (start < 0) {
+            return null;
+        }
         int depth = 0;
         for (int i = start; i < text.length(); i++) {
             char c = text.charAt(i);
-            if (c == '{') depth++;
-            else if (c == '}') {
+            if (c == '{') {
+                depth++;
+            } else if (c == '}') {
                 depth--;
                 if (depth == 0) {
                     String candidate = text.substring(start, i + 1);
                     try {
-                        JsonNode n = objectMapper.readTree(candidate);
-                        return objectMapper.writeValueAsString(n);
+                        JsonNode parsed = objectMapper.readTree(candidate);
+                        return objectMapper.writeValueAsString(parsed);
                     } catch (Exception ignore) {
                         return null;
                     }
@@ -220,21 +156,5 @@ public class ClaudeService {
             }
         }
         return null;
-    }
-
-    private String createFallbackResponse(String errorMessage) {
-        log.info("Creating fallback response for: {}", errorMessage);
-        return String.format("""
-            {
-                "correctness": {"score": 8, "feedback": "Code appears functionally correct based on basic analysis - %s"},
-                "timeComplexity": {"score": 7, "feedback": "Time complexity looks reasonable", "bigO": "O(n)"},
-                "spaceComplexity": {"score": 7, "feedback": "Space usage appears efficient", "bigO": "O(1)"},
-                "clarity": {"score": 8, "feedback": "Code is generally readable"},
-                "overallRating": 7,
-                "overallFeedback": "Good solution overall. %s",
-                "strengths": ["Functional correctness", "Readable structure"],
-                "improvements": ["Could add more comments", "Consider edge cases"]
-            }
-            """, errorMessage, errorMessage);
     }
 }

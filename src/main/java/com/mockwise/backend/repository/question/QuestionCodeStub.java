@@ -23,7 +23,7 @@ public class QuestionCodeStub {
     private Question question;
 
     @Column(name = "language", nullable = false, length = 32)
-    private String language;
+    private ProgrammingLanguage language;
 
     @Column(name = "stub", nullable = false, columnDefinition = "text")
     private String stub;

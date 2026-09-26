@@ -13,6 +13,75 @@
     "bearerAuth" : [ ]
   } ],
   "paths" : {
+    "/api/system-design/sessions" : {
+      "post" : {
+        "tags" : [ "design-session-controller" ],
+        "operationId" : "start",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/StartDesignRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object",
+                  "additionalProperties" : { }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/system-design/sessions/{sessionKey}/submit" : {
+      "post" : {
+        "tags" : [ "design-session-controller" ],
+        "operationId" : "submit",
+        "parameters" : [ {
+          "name" : "sessionKey",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SubmitDesignRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/interview/{interviewId}/submit" : {
       "post" : {
         "tags" : [ "interview-controller" ],
@@ -187,6 +256,62 @@
         }
       }
     },
+    "/api/system-design/sessions/{sessionKey}" : {
+      "get" : {
+        "tags" : [ "design-session-controller" ],
+        "operationId" : "load",
+        "parameters" : [ {
+          "name" : "sessionKey",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object",
+                  "additionalProperties" : { }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/system-design/sessions/{sessionKey}/feedback" : {
+      "get" : {
+        "tags" : [ "design-session-controller" ],
+        "operationId" : "feedback",
+        "parameters" : [ {
+          "name" : "sessionKey",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object",
+                  "additionalProperties" : { }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/questions/{questionId}" : {
       "get" : {
         "tags" : [ "question-controller" ],
@@ -231,7 +356,8 @@
           "in" : "query",
           "required" : true,
           "schema" : {
-            "type" : "string"
+            "type" : "string",
+            "enum" : [ "java", "python", "cpp", "javascript", "typescript", "go", "rust", "ruby", "scala", "csharp" ]
           }
         } ],
         "responses" : {
@@ -268,7 +394,8 @@
           "in" : "query",
           "required" : true,
           "schema" : {
-            "type" : "string"
+            "type" : "string",
+            "enum" : [ "java", "python", "cpp", "javascript", "typescript", "go", "rust", "ruby", "scala", "csharp" ]
           }
         } ],
         "responses" : {
@@ -382,6 +509,14 @@
       "get" : {
         "tags" : [ "dashboard-controller" ],
         "operationId" : "getProgress",
+        "parameters" : [ {
+          "name" : "practice",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
         "responses" : {
           "200" : {
             "description" : "OK",
@@ -400,6 +535,14 @@
       "get" : {
         "tags" : [ "dashboard-controller" ],
         "operationId" : "getDashboardData",
+        "parameters" : [ {
+          "name" : "practice",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
         "responses" : {
           "200" : {
             "description" : "OK",
@@ -438,6 +581,31 @@
   },
   "components" : {
     "schemas" : {
+      "StartDesignRequest" : {
+        "type" : "object",
+        "properties" : {
+          "difficulty" : {
+            "type" : "string",
+            "enum" : [ "EASY", "MEDIUM", "HARD" ]
+          },
+          "timeMinutes" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "JsonNode" : { },
+      "SubmitDesignRequest" : {
+        "type" : "object",
+        "properties" : {
+          "scene" : {
+            "$ref" : "#/components/schemas/JsonNode"
+          },
+          "caption" : {
+            "type" : "string"
+          }
+        }
+      },
       "SubmissionRequest" : {
         "type" : "object",
         "properties" : {
@@ -449,7 +617,8 @@
             "type" : "string"
           },
           "language" : {
-            "type" : "string"
+            "type" : "string",
+            "enum" : [ "java", "python", "cpp", "javascript", "typescript", "go", "rust", "ruby", "scala", "csharp" ]
           },
           "timeComplexity" : {
             "type" : "string"
@@ -480,7 +649,8 @@
             "type" : "string"
           },
           "statusCode" : {
-            "type" : "string"
+            "type" : "string",
+            "enum" : [ "STARTED", "READY" ]
           },
           "message" : {
             "type" : "string"
@@ -520,7 +690,8 @@
             "type" : "string"
           },
           "difficulty" : {
-            "type" : "string"
+            "type" : "string",
+            "enum" : [ "EASY", "MEDIUM", "HARD" ]
           },
           "stubs" : {
             "type" : "array",
@@ -540,7 +711,8 @@
         "type" : "object",
         "properties" : {
           "language" : {
-            "type" : "string"
+            "type" : "string",
+            "enum" : [ "java", "python", "cpp", "javascript", "typescript", "go", "rust", "ruby", "scala", "csharp" ]
           },
           "code" : {
             "type" : "string"

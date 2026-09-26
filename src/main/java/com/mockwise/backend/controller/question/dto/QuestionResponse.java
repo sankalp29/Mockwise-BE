@@ -1,5 +1,6 @@
 package com.mockwise.backend.controller.question.dto;
 
+import com.mockwise.backend.repository.question.Difficulty;
 import java.util.UUID;
 
 import com.mockwise.backend.repository.question.Question;
@@ -10,7 +11,7 @@ public record QuestionResponse(
         String description,
         String example,
         String constraints,
-        Question.Difficulty difficulty
+        Difficulty difficulty
 ) {
     public static QuestionResponse from(Question question) {
         return new QuestionResponse(

@@ -1,5 +1,6 @@
 package com.mockwise.backend.service.interview;
 
+import com.mockwise.backend.repository.question.Difficulty;
 import com.mockwise.backend.exception.BadRequestException;
 import com.mockwise.backend.exception.ConflictException;
 import com.mockwise.backend.exception.ForbiddenException;
@@ -63,13 +64,13 @@ class InterviewServiceOwnershipTest {
         assignedQuestion.setId(assignedQuestionId);
         assignedQuestion.setTitle("Two Sum");
         assignedQuestion.setDescription("desc");
-        assignedQuestion.setDifficulty(Question.Difficulty.EASY);
+        assignedQuestion.setDifficulty(Difficulty.EASY);
 
         interview = new Interview();
         interview.setId(interviewId);
         interview.setUserId(OWNER);
         interview.setUserEmail("owner@test.com");
-        interview.setDifficulty(Question.Difficulty.EASY);
+        interview.setDifficulty(Difficulty.EASY);
         interview.setNumQuestions(1);
         interview.setTimeMinutes(30);
         interview.setStartedAt(Instant.now().minusSeconds(60));
@@ -110,7 +111,7 @@ class InterviewServiceOwnershipTest {
         when(interviewRepository.save(any(Interview.class))).thenAnswer(inv -> inv.getArgument(0));
         when(userSubmissionRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
 
-        SubmittedSolution req = new SubmittedSolution(assignedQuestionId, "code", "java", null, null);
+        SubmittedSolution req = new SubmittedSolution(assignedQuestionId, "code", com.mockwise.backend.repository.question.ProgrammingLanguage.JAVA, null, null);
         Interview result = interviewService.endInterview(interviewId, OWNER, List.of(req));
 
         assertEquals(Interview.Status.COMPLETED, result.getStatus());
@@ -123,7 +124,7 @@ class InterviewServiceOwnershipTest {
     void endInterview_wrongUser_throwsForbidden() {
         when(interviewRepository.findById(interviewId)).thenReturn(Optional.of(interview));
 
-        SubmittedSolution req = new SubmittedSolution(assignedQuestionId, "code", "java", null, null);
+        SubmittedSolution req = new SubmittedSolution(assignedQuestionId, "code", com.mockwise.backend.repository.question.ProgrammingLanguage.JAVA, null, null);
         assertThrows(ForbiddenException.class,
                 () -> interviewService.endInterview(interviewId, OTHER, List.of(req)));
         verify(userSubmissionRepository, never()).saveAll(anyList());
@@ -134,7 +135,7 @@ class InterviewServiceOwnershipTest {
         interview.setStatus(Interview.Status.COMPLETED);
         when(interviewRepository.findById(interviewId)).thenReturn(Optional.of(interview));
 
-        SubmittedSolution req = new SubmittedSolution(assignedQuestionId, "code", "java", null, null);
+        SubmittedSolution req = new SubmittedSolution(assignedQuestionId, "code", com.mockwise.backend.repository.question.ProgrammingLanguage.JAVA, null, null);
         assertThrows(ConflictException.class,
                 () -> interviewService.endInterview(interviewId, OWNER, List.of(req)));
         verify(userSubmissionRepository, never()).saveAll(anyList());
@@ -147,7 +148,7 @@ class InterviewServiceOwnershipTest {
         when(interviewQuestionRepository.findQuestionIdsByInterviewId(interviewId))
                 .thenReturn(List.of(assignedQuestionId));
 
-        SubmittedSolution req = new SubmittedSolution(foreignQuestionId, "code", "java", null, null);
+        SubmittedSolution req = new SubmittedSolution(foreignQuestionId, "code", com.mockwise.backend.repository.question.ProgrammingLanguage.JAVA, null, null);
         assertThrows(BadRequestException.class,
                 () -> interviewService.endInterview(interviewId, OWNER, List.of(req)));
         verify(userSubmissionRepository, never()).saveAll(anyList());
@@ -210,7 +211,7 @@ class InterviewServiceOwnershipTest {
         when(userSubmissionRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
 
         SubmittedSolution req = new SubmittedSolution(
-                assignedQuestionId, "class S {}", "java", "O(n)", "O(1)");
+                assignedQuestionId, "class S {}", com.mockwise.backend.repository.question.ProgrammingLanguage.JAVA, "O(n)", "O(1)");
 
         interviewService.endInterview(interviewId, OWNER, List.of(req));
 
@@ -219,7 +220,7 @@ class InterviewServiceOwnershipTest {
         verify(userSubmissionRepository).saveAll(captor.capture());
         UserSubmission saved = captor.getValue().get(0);
         assertEquals("class S {}", saved.getCode());
-        assertEquals("java", saved.getLanguage());
+        assertEquals(com.mockwise.backend.repository.question.ProgrammingLanguage.JAVA, saved.getLanguage());
         assertEquals("O(n)", saved.getUserTimeComplexity());
         assertEquals("O(1)", saved.getUserSpaceComplexity());
         assertEquals(assignedQuestion, saved.getQuestion());

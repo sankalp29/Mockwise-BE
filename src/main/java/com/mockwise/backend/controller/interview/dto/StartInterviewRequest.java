@@ -1,5 +1,6 @@
 package com.mockwise.backend.controller.interview.dto;
 
+import com.mockwise.backend.repository.question.Difficulty;
 import com.mockwise.backend.repository.question.Question;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -9,7 +10,7 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 public class StartInterviewRequest {
-    private Question.Difficulty difficulty;
+    private Difficulty difficulty;
     private Integer numQuestions;
     private Integer timeMinutes;
 }

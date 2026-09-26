@@ -1,5 +1,6 @@
 package com.mockwise.backend.service.progress;
 
+import com.mockwise.backend.repository.question.Difficulty;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -44,7 +45,7 @@ public class UserQuestionSeenService {
     }
 
     @Transactional
-    public void markQuestionsAsSeen(String userId, List<UUID> questionIds, Question.Difficulty difficulty) {
+    public void markQuestionsAsSeen(String userId, List<UUID> questionIds, Difficulty difficulty) {
         log.info("Marking {} questions as seen for user: {}", questionIds.size(), userId);
         try {
             if (questionIds == null || questionIds.isEmpty()) {
@@ -74,7 +75,7 @@ public class UserQuestionSeenService {
 
     @Async
     public CompletableFuture<Void> markQuestionsAsSeenAsync(String userId, List<UUID> questionIds,
-                                                            Question.Difficulty difficulty) {
+                                                            Difficulty difficulty) {
         try {
             log.info("Async marking {} questions as seen for user: {}", questionIds.size(), userId);
             List<UserQuestionSeen> seenQuestions = questionIds.stream()

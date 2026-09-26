@@ -1,5 +1,9 @@
 package com.mockwise.backend.service.question;
 
+import com.mockwise.backend.repository.question.Difficulty;
+import com.mockwise.backend.repository.question.ProgrammingLanguage;
+import com.mockwise.backend.repository.question.Question;
+
 import java.util.List;
 
 /**
@@ -11,10 +15,10 @@ public record NewQuestion(
         String description,
         String example,
         String constraints,
-        String difficulty,
+        Difficulty difficulty,
         List<LanguageCode> stubs,
         List<LanguageCode> optimalSolutions
 ) {
-    public record LanguageCode(String language, String code) {
+    public record LanguageCode(ProgrammingLanguage language, String code) {
     }
 }

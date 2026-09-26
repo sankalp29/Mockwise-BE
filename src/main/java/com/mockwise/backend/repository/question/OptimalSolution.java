@@ -27,7 +27,7 @@ public class OptimalSolution {
     private Question question;
 
     @Column(name = "language", nullable = false)
-    private String language;
+    private ProgrammingLanguage language;
 
     @Column(name = "code", columnDefinition = "TEXT", nullable = false)
     private String code;

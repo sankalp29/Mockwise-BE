@@ -1,5 +1,6 @@
 package com.mockwise.backend.controller.systemdesign.dto;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -8,6 +9,6 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 public class SubmitDesignRequest {
-    private String scene;
+    private JsonNode scene;
     private String caption;
 }

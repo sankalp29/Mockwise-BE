@@ -1,5 +1,6 @@
 package com.mockwise.backend.service.question;
 
+import com.mockwise.backend.repository.question.ProgrammingLanguage;
 import com.mockwise.backend.repository.question.QuestionCodeStub;
 import com.mockwise.backend.repository.question.QuestionCodeStubRepository;
 import org.junit.jupiter.api.Test;
@@ -26,18 +27,18 @@ class QuestionStubServiceTest {
         UUID questionId = UUID.randomUUID();
         QuestionCodeStub stub = new QuestionCodeStub();
         stub.setStub("class Solution {}");
-        when(questionCodeStubRepository.findFirstByQuestion_IdAndLanguageIgnoreCase(questionId, "java"))
+        when(questionCodeStubRepository.findFirstByQuestion_IdAndLanguage(questionId, ProgrammingLanguage.JAVA))
                 .thenReturn(Optional.of(stub));
 
-        assertEquals(Optional.of("class Solution {}"), questionStubService.stubFor(questionId, "java"));
+        assertEquals(Optional.of("class Solution {}"), questionStubService.stubFor(questionId, ProgrammingLanguage.JAVA));
     }
 
     @Test
     void returnsEmptyWhenNoStubExists() {
         UUID questionId = UUID.randomUUID();
-        when(questionCodeStubRepository.findFirstByQuestion_IdAndLanguageIgnoreCase(questionId, "python"))
+        when(questionCodeStubRepository.findFirstByQuestion_IdAndLanguage(questionId, ProgrammingLanguage.PYTHON))
                 .thenReturn(Optional.empty());
 
-        assertTrue(questionStubService.stubFor(questionId, "python").isEmpty());
+        assertTrue(questionStubService.stubFor(questionId, ProgrammingLanguage.PYTHON).isEmpty());
     }
 }

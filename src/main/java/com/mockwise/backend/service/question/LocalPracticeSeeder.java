@@ -1,5 +1,6 @@
 package com.mockwise.backend.service.question;
 
+import com.mockwise.backend.repository.question.Difficulty;
 import com.mockwise.backend.repository.auth.AppUser;
 import com.mockwise.backend.repository.auth.AppUserRepository;
 import com.mockwise.backend.repository.auth.UserRole;
@@ -9,6 +10,7 @@ import com.mockwise.backend.repository.interview.InterviewQuestion;
 import com.mockwise.backend.repository.interview.InterviewQuestionRepository;
 import com.mockwise.backend.repository.interview.InterviewRepository;
 import com.mockwise.backend.repository.question.OptimalSolution;
+import com.mockwise.backend.repository.question.ProgrammingLanguage;
 import com.mockwise.backend.repository.question.OptimalSolutionRepository;
 import com.mockwise.backend.repository.question.Question;
 import com.mockwise.backend.repository.question.QuestionCodeStub;
@@ -54,27 +56,27 @@ public class LocalPracticeSeeder implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        List<String> languages = languageToolchainRegistry.all().stream()
-                .map(tool -> tool.languageId())
+        List<ProgrammingLanguage> languages = languageToolchainRegistry.all().stream()
+                .map(tool -> tool.language())
                 .toList();
         for (QuestionCodeCatalog.SeedQuestion seed : QuestionCodeCatalog.questions()) {
             Question question = questionRepository.findFirstByTitleIgnoreCase(seed.title()).orElseGet(() -> {
                 Question created = new Question();
                 created.setTitle(seed.title());
-                created.setDifficulty(Question.Difficulty.EASY);
+                created.setDifficulty(Difficulty.EASY);
                 return created;
             });
             question.setDescription(seed.description());
             question.setExample(seed.example());
             question.setConstraints(seed.constraints());
             if (question.getDifficulty() == null) {
-                question.setDifficulty(Question.Difficulty.EASY);
+                question.setDifficulty(Difficulty.EASY);
             }
             Question saved = questionRepository.save(question);
             writeSamples(saved, seed.samples(), languages);
         }
         for (Question question : questionRepository.findAll()) {
-            if (questionCodeStubRepository.findFirstByQuestion_IdAndLanguageIgnoreCase(question.getId(), "java").isEmpty()) {
+            if (questionCodeStubRepository.findFirstByQuestion_IdAndLanguage(question.getId(), ProgrammingLanguage.JAVA).isEmpty()) {
                 writeSamples(question, genericSamples(), languages);
             }
         }
@@ -90,14 +92,15 @@ public class LocalPracticeSeeder implements ApplicationRunner {
         appUserRepository.save(admin);
     }
 
-    private void writeSamples(Question question, Map<String, QuestionCodeCatalog.Sample> samples, List<String> languages) {
+    private void writeSamples(Question question, Map<ProgrammingLanguage, QuestionCodeCatalog.Sample> samples,
+                               List<ProgrammingLanguage> languages) {
         Instant now = Instant.now();
-        for (String language : languages) {
+        for (ProgrammingLanguage language : languages) {
             QuestionCodeCatalog.Sample sample = samples.get(language);
             if (sample == null) {
                 continue;
             }
-            if (questionCodeStubRepository.findFirstByQuestion_IdAndLanguageIgnoreCase(question.getId(), language).isEmpty()) {
+            if (questionCodeStubRepository.findFirstByQuestion_IdAndLanguage(question.getId(), language).isEmpty()) {
                 QuestionCodeStub stub = new QuestionCodeStub();
                 stub.setQuestion(question);
                 stub.setLanguage(language);
@@ -134,7 +137,7 @@ public class LocalPracticeSeeder implements ApplicationRunner {
         Interview interview = new Interview();
         interview.setUserId(LOCAL_USER_ID);
         interview.setUserEmail(LOCAL_USER_EMAIL);
-        interview.setDifficulty(Question.Difficulty.EASY);
+        interview.setDifficulty(Difficulty.EASY);
         interview.setNumQuestions(2);
         interview.setTimeMinutes(30);
         interview.setStartedAt(Instant.now().minusSeconds(1800));
@@ -154,7 +157,7 @@ public class LocalPracticeSeeder implements ApplicationRunner {
         submission.setInterview(interview);
         submission.setQuestion(question);
         submission.setCode(code);
-        submission.setLanguage("java");
+        submission.setLanguage(ProgrammingLanguage.JAVA);
         submission.setSubmittedAt(interview.getEndedAt());
         submission.setFeedbackGeneratedAt(interview.getEndedAt());
         submission.setUserTimeComplexity("O(n)");
@@ -163,21 +166,21 @@ public class LocalPracticeSeeder implements ApplicationRunner {
         return submission;
     }
 
-    private static Map<String, QuestionCodeCatalog.Sample> genericSamples() {
+    private static Map<ProgrammingLanguage, QuestionCodeCatalog.Sample> genericSamples() {
         QuestionCodeCatalog.Sample java = new QuestionCodeCatalog.Sample(
                 "class Solution {\n    public int solve(int[] nums) {\n        return 0;\n    }\n}\n",
                 "class Solution {\n    public int solve(int[] nums) {\n        int best = 0;\n        for (int value : nums) best = Math.max(best, value);\n        return best;\n    }\n}\n");
         return Map.of(
-                "java", java,
-                "python", new QuestionCodeCatalog.Sample("class Solution:\n    def solve(self, nums):\n        return 0\n", "class Solution:\n    def solve(self, nums):\n        return max(nums) if nums else 0\n"),
-                "cpp", new QuestionCodeCatalog.Sample("#include <bits/stdc++.h>\nusing namespace std;\nclass Solution {\npublic:\n    int solve(vector<int>& nums) { return 0; }\n};\n", "#include <bits/stdc++.h>\nusing namespace std;\nclass Solution {\npublic:\n    int solve(vector<int>& nums) { return nums.empty() ? 0 : *max_element(nums.begin(), nums.end()); }\n};\n"),
-                "javascript", new QuestionCodeCatalog.Sample("function solve(nums) {\n  return 0;\n}\n", "function solve(nums) {\n  return nums.length ? Math.max(...nums) : 0;\n}\n"),
-                "typescript", new QuestionCodeCatalog.Sample("function solve(nums: number[]): number {\n  return 0;\n}\n", "function solve(nums: number[]): number {\n  return nums.length ? Math.max(...nums) : 0;\n}\n"),
-                "go", new QuestionCodeCatalog.Sample("package main\n\nfunc solve(nums []int) int {\n    return 0\n}\n", "package main\n\nfunc solve(nums []int) int {\n    best := 0\n    for _, value := range nums {\n        if value > best { best = value }\n    }\n    return best\n}\n"),
-                "rust", new QuestionCodeCatalog.Sample("fn solve(_nums: &[i32]) -> i32 {\n    0\n}\n", "fn solve(nums: &[i32]) -> i32 {\n    nums.iter().copied().max().unwrap_or(0)\n}\n"),
-                "ruby", new QuestionCodeCatalog.Sample("def solve(nums)\n  0\nend\n", "def solve(nums)\n  nums.max || 0\nend\n"),
-                "scala", new QuestionCodeCatalog.Sample("object Solution {\n  def solve(nums: Array[Int]): Int = 0\n}\n", "object Solution {\n  def solve(nums: Array[Int]): Int = if (nums.isEmpty) 0 else nums.max\n}\n"),
-                "csharp", new QuestionCodeCatalog.Sample("public class Solution {\n    public int Solve(int[] nums) { return 0; }\n    public static void Main() {}\n}\n", "public class Solution {\n    public int Solve(int[] nums) { int best = 0; foreach (int value in nums) if (value > best) best = value; return best; }\n    public static void Main() {}\n}\n")
+                ProgrammingLanguage.JAVA, java,
+                ProgrammingLanguage.PYTHON, new QuestionCodeCatalog.Sample("class Solution:\n    def solve(self, nums):\n        return 0\n", "class Solution:\n    def solve(self, nums):\n        return max(nums) if nums else 0\n"),
+                ProgrammingLanguage.CPP, new QuestionCodeCatalog.Sample("#include <bits/stdc++.h>\nusing namespace std;\nclass Solution {\npublic:\n    int solve(vector<int>& nums) { return 0; }\n};\n", "#include <bits/stdc++.h>\nusing namespace std;\nclass Solution {\npublic:\n    int solve(vector<int>& nums) { return nums.empty() ? 0 : *max_element(nums.begin(), nums.end()); }\n};\n"),
+                ProgrammingLanguage.JAVASCRIPT, new QuestionCodeCatalog.Sample("function solve(nums) {\n  return 0;\n}\n", "function solve(nums) {\n  return nums.length ? Math.max(...nums) : 0;\n}\n"),
+                ProgrammingLanguage.TYPESCRIPT, new QuestionCodeCatalog.Sample("function solve(nums: number[]): number {\n  return 0;\n}\n", "function solve(nums: number[]): number {\n  return nums.length ? Math.max(...nums) : 0;\n}\n"),
+                ProgrammingLanguage.GO, new QuestionCodeCatalog.Sample("package main\n\nfunc solve(nums []int) int {\n    return 0\n}\n", "package main\n\nfunc solve(nums []int) int {\n    best := 0\n    for _, value := range nums {\n        if value > best { best = value }\n    }\n    return best\n}\n"),
+                ProgrammingLanguage.RUST, new QuestionCodeCatalog.Sample("fn solve(_nums: &[i32]) -> i32 {\n    0\n}\n", "fn solve(nums: &[i32]) -> i32 {\n    nums.iter().copied().max().unwrap_or(0)\n}\n"),
+                ProgrammingLanguage.RUBY, new QuestionCodeCatalog.Sample("def solve(nums)\n  0\nend\n", "def solve(nums)\n  nums.max || 0\nend\n"),
+                ProgrammingLanguage.SCALA, new QuestionCodeCatalog.Sample("object Solution {\n  def solve(nums: Array[Int]): Int = 0\n}\n", "object Solution {\n  def solve(nums: Array[Int]): Int = if (nums.isEmpty) 0 else nums.max\n}\n"),
+                ProgrammingLanguage.CSHARP, new QuestionCodeCatalog.Sample("public class Solution {\n    public int Solve(int[] nums) { return 0; }\n    public static void Main() {}\n}\n", "public class Solution {\n    public int Solve(int[] nums) { int best = 0; foreach (int value in nums) if (value > best) best = value; return best; }\n    public static void Main() {}\n}\n")
         );
     }
 

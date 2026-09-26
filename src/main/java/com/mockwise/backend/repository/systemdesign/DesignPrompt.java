@@ -1,5 +1,6 @@
 package com.mockwise.backend.repository.systemdesign;
 
+import com.mockwise.backend.repository.question.Difficulty;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -37,5 +38,5 @@ public class DesignPrompt {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private Level level;
+    private Difficulty level;
 }

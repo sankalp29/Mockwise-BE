@@ -1,5 +1,6 @@
 package com.mockwise.backend.repository.systemdesign;
 
+import com.mockwise.backend.repository.question.Difficulty;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -8,7 +9,7 @@ import java.util.UUID;
 
 public interface DesignPromptRepository extends JpaRepository<DesignPrompt, UUID> {
 
-    List<DesignPrompt> findByLevel(Level level);
+    List<DesignPrompt> findByLevel(Difficulty level);
 
     Optional<DesignPrompt> findFirstByTitleIgnoreCase(String title);
 }

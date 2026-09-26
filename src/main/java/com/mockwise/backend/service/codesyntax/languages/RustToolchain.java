@@ -1,5 +1,6 @@
 package com.mockwise.backend.service.codesyntax.languages;
 
+import com.mockwise.backend.repository.question.ProgrammingLanguage;
 import com.mockwise.backend.service.codesyntax.LanguageToolchain;
 import com.mockwise.backend.service.codesyntax.model.SyntaxCheckResult;
 import com.mockwise.backend.service.codesyntax.support.CommandProbe;
@@ -12,7 +13,6 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 @Component
@@ -26,18 +26,8 @@ public class RustToolchain implements LanguageToolchain {
     }
 
     @Override
-    public String languageId() {
-        return "rust";
-    }
-
-    @Override
-    public String displayName() {
-        return "Rust";
-    }
-
-    @Override
-    public Set<String> aliases() {
-        return Set.of("rs");
+    public ProgrammingLanguage language() {
+        return ProgrammingLanguage.RUST;
     }
 
     @Override

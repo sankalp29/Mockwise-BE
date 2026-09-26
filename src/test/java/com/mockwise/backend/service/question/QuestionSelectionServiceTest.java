@@ -1,5 +1,6 @@
 package com.mockwise.backend.service.question;
 
+import com.mockwise.backend.repository.question.Difficulty;
 import com.mockwise.backend.repository.progress.UserQuestionSeenRepository;
 import com.mockwise.backend.repository.question.Question;
 import com.mockwise.backend.repository.question.QuestionRepository;
@@ -34,10 +35,10 @@ class QuestionSelectionServiceTest {
         question.setTitle("Two Sum");
         when(questionRepository.findRandomQuestionsByDifficulty("EASY", 1))
                 .thenThrow(new RuntimeException("random unavailable"));
-        when(questionRepository.findByDifficulty(Question.Difficulty.EASY)).thenReturn(List.of(question));
+        when(questionRepository.findByDifficulty(Difficulty.EASY)).thenReturn(List.of(question));
 
         List<Question> selected = questionSelectionService.getRandomQuestionsForUser(
-                null, Question.Difficulty.EASY, 1);
+                null, Difficulty.EASY, 1);
 
         assertEquals(List.of(question), selected);
         verify(userQuestionSeenRepository, never()).findSeenQuestionIdsByUserAndDifficulty(any(), any());
@@ -48,16 +49,16 @@ class QuestionSelectionServiceTest {
         UUID seenId = UUID.randomUUID();
         Question fresh = new Question();
         fresh.setTitle("Fresh");
-        when(userQuestionSeenRepository.findSeenQuestionIdsByUserAndDifficulty("user-1", Question.Difficulty.MEDIUM))
+        when(userQuestionSeenRepository.findSeenQuestionIdsByUserAndDifficulty("user-1", Difficulty.MEDIUM))
                 .thenReturn(List.of(seenId));
-        when(userQuestionSeenRepository.countTotalQuestionsByDifficulty(Question.Difficulty.MEDIUM)).thenReturn(1L);
+        when(userQuestionSeenRepository.countTotalQuestionsByDifficulty(Difficulty.MEDIUM)).thenReturn(1L);
         when(questionRepository.findRandomQuestionsByDifficulty(eq("MEDIUM"), eq(1))).thenReturn(List.of(fresh));
 
         List<Question> selected = questionSelectionService.getRandomQuestionsForUser(
-                "user-1", Question.Difficulty.MEDIUM, 1);
+                "user-1", Difficulty.MEDIUM, 1);
 
         assertEquals(List.of(fresh), selected);
-        verify(userQuestionSeenRepository).deleteByUserIdAndDifficulty("user-1", Question.Difficulty.MEDIUM);
+        verify(userQuestionSeenRepository).deleteByUserIdAndDifficulty("user-1", Difficulty.MEDIUM);
         verify(questionRepository, never()).findRandomQuestionsByDifficultyExcluding(any(), anyList(), anyInt());
     }
 }

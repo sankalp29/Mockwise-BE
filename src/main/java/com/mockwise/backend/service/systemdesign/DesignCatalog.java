@@ -1,6 +1,6 @@
 package com.mockwise.backend.service.systemdesign;
 
-import com.mockwise.backend.repository.systemdesign.Level;
+import com.mockwise.backend.repository.question.Difficulty;
 
 import java.util.List;
 
@@ -9,7 +9,7 @@ import java.util.List;
  */
 public final class DesignCatalog {
 
-    public record PromptDraft(String title, Level level, String brief, String requirements, String constraints) {
+    public record PromptDraft(String title, Difficulty level, String brief, String requirements, String constraints) {
     }
 
     private DesignCatalog() {
@@ -19,7 +19,7 @@ public final class DesignCatalog {
         return List.of(
                 new PromptDraft(
                         "URL Shortener",
-                        Level.EASY,
+                        Difficulty.EASY,
                         """
                         ## URL Shortener
 
@@ -39,7 +39,7 @@ public final class DesignCatalog {
                 ),
                 new PromptDraft(
                         "News Feed",
-                        Level.MEDIUM,
+                        Difficulty.MEDIUM,
                         """
                         ## News Feed
 
@@ -59,7 +59,7 @@ public final class DesignCatalog {
                 ),
                 new PromptDraft(
                         "Chat Service",
-                        Level.HARD,
+                        Difficulty.HARD,
                         """
                         ## Chat Service
 

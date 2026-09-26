@@ -22,9 +22,9 @@ public class LanguageToolchainRegistry {
         Map<String, LanguageToolchain> map = new HashMap<>();
         Map<String, LanguageToolchain> unique = new LinkedHashMap<>();
         for (LanguageToolchain tool : toolchains) {
-            unique.putIfAbsent(tool.languageId(), tool);
-            register(map, tool.languageId(), tool);
-            for (String alias : tool.aliases()) {
+            unique.putIfAbsent(tool.language().id(), tool);
+            register(map, tool.language().id(), tool);
+            for (String alias : tool.language().aliases()) {
                 register(map, alias, tool);
             }
         }

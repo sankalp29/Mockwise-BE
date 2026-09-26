@@ -1,5 +1,6 @@
 package com.mockwise.backend.service.codesyntax;
 
+import com.mockwise.backend.repository.question.ProgrammingLanguage;
 import com.mockwise.backend.service.codesyntax.model.SyntaxCheckResult;
 
 import java.nio.file.Path;
@@ -10,11 +11,17 @@ import java.util.Set;
  */
 public interface LanguageToolchain {
 
+    ProgrammingLanguage language();
+
     /** Canonical id, e.g. {@code java}, {@code python}, {@code cpp}. */
-    String languageId();
+    default String languageId() {
+        return language().id();
+    }
 
     /** Alternate spellings accepted by the API, e.g. {@code c++}, {@code js}. */
-    Set<String> aliases();
+    default Set<String> aliases() {
+        return language().aliases();
+    }
 
     /**
      * Best-effort probe: whether the local toolchain looks installed.
@@ -26,7 +33,7 @@ public interface LanguageToolchain {
 
     /** Display name for UI. */
     default String displayName() {
-        return languageId();
+        return language().displayName();
     }
 
     SyntaxCheckResult checkSyntax(String code, Path workDir);

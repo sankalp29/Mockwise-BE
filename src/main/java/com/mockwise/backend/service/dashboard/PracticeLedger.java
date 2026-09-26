@@ -47,7 +47,7 @@ public class PracticeLedger {
         row.setUserId(interview.getUserId());
         row.setPractice(Practice.CODING);
         row.setSourceKey(interview.getId());
-        row.setDifficulty(interview.getDifficulty().name());
+        row.setDifficulty(interview.getDifficulty());
         row.setQuestionCount(interview.getNumQuestions() == null ? 0 : interview.getNumQuestions());
         row.setOverallRating(interview.getOverallRating() == null ? 0.0 : interview.getOverallRating());
         row.setTimeMinutes(minutes(interview.getStartedAt(), interview.getEndedAt(), interview.getTimeMinutes()));
@@ -67,7 +67,7 @@ public class PracticeLedger {
         row.setUserId(session.getUserId());
         row.setPractice(Practice.SYSTEM_DESIGN);
         row.setSourceKey(session.getId());
-        row.setDifficulty(session.getLevel().name());
+        row.setDifficulty(session.getLevel());
         row.setQuestionCount(1);
         row.setOverallRating(session.getOverallRating() == null ? 0.0 : session.getOverallRating());
         row.setTimeMinutes(minutes(session.getStartedAt(), session.getEndedAt(), session.getTimeMinutes()));

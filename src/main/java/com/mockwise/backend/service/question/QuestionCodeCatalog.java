@@ -1,5 +1,7 @@
 package com.mockwise.backend.service.question;
 
+import com.mockwise.backend.repository.question.ProgrammingLanguage;
+
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,7 +20,7 @@ public final class QuestionCodeCatalog {
             String description,
             String example,
             String constraints,
-            Map<String, Sample> samples
+            Map<ProgrammingLanguage, Sample> samples
     ) {
     }
 
@@ -35,11 +37,11 @@ public final class QuestionCodeCatalog {
         );
     }
 
-    private static SeedQuestion question(String title, String[] markdown, Map<String, Sample> samples) {
+    private static SeedQuestion question(String title, String[] markdown, Map<ProgrammingLanguage, Sample> samples) {
         return new SeedQuestion(title, markdown[0], markdown[1], markdown[2], samples);
     }
 
-    private static Map<String, Sample> pack(String javaSig, String javaStub, String javaOpt,
+    private static Map<ProgrammingLanguage, Sample> pack(String javaSig, String javaStub, String javaOpt,
                                             String pySig, String pyStub, String pyOpt,
                                             String cppSig, String cppStub, String cppOpt,
                                             String jsStub, String jsOpt,
@@ -49,17 +51,17 @@ public final class QuestionCodeCatalog {
                                             String rubyStub, String rubyOpt,
                                             String scalaStub, String scalaOpt,
                                             String csStub, String csOpt) {
-        Map<String, Sample> samples = new LinkedHashMap<>();
-        samples.put("java", new Sample(javaWrap(javaSig, javaStub), javaWrap(javaSig, javaOpt)));
-        samples.put("python", new Sample(pyWrap(pySig, pyStub), pyWrap(pySig, pyOpt)));
-        samples.put("cpp", new Sample(cppWrap(cppSig, cppStub), cppWrap(cppSig, cppOpt)));
-        samples.put("javascript", new Sample(jsStub, jsOpt));
-        samples.put("typescript", new Sample(tsStub, tsOpt));
-        samples.put("go", new Sample(goWrap(goStub), goWrap(goOpt)));
-        samples.put("rust", new Sample(rustStub, rustOpt));
-        samples.put("ruby", new Sample(rubyStub, rubyOpt));
-        samples.put("scala", new Sample(scalaStub, scalaOpt));
-        samples.put("csharp", new Sample(csWrap(csStub), csWrap(csOpt)));
+        Map<ProgrammingLanguage, Sample> samples = new LinkedHashMap<>();
+        samples.put(ProgrammingLanguage.JAVA, new Sample(javaWrap(javaSig, javaStub), javaWrap(javaSig, javaOpt)));
+        samples.put(ProgrammingLanguage.PYTHON, new Sample(pyWrap(pySig, pyStub), pyWrap(pySig, pyOpt)));
+        samples.put(ProgrammingLanguage.CPP, new Sample(cppWrap(cppSig, cppStub), cppWrap(cppSig, cppOpt)));
+        samples.put(ProgrammingLanguage.JAVASCRIPT, new Sample(jsStub, jsOpt));
+        samples.put(ProgrammingLanguage.TYPESCRIPT, new Sample(tsStub, tsOpt));
+        samples.put(ProgrammingLanguage.GO, new Sample(goWrap(goStub), goWrap(goOpt)));
+        samples.put(ProgrammingLanguage.RUST, new Sample(rustStub, rustOpt));
+        samples.put(ProgrammingLanguage.RUBY, new Sample(rubyStub, rubyOpt));
+        samples.put(ProgrammingLanguage.SCALA, new Sample(scalaStub, scalaOpt));
+        samples.put(ProgrammingLanguage.CSHARP, new Sample(csWrap(csStub), csWrap(csOpt)));
         return samples;
     }
 
@@ -84,7 +86,7 @@ public final class QuestionCodeCatalog {
         return "public class Solution {\n" + method + "\n    public static void Main() {}\n}\n";
     }
 
-    private static Map<String, Sample> twoSumSamples() {
+    private static Map<ProgrammingLanguage, Sample> twoSumSamples() {
         return pack(
                 "public int[] twoSum(int[] nums, int target)",
                 "        return new int[0];",
@@ -213,7 +215,7 @@ public final class QuestionCodeCatalog {
         );
     }
 
-    private static Map<String, Sample> parensSamples() {
+    private static Map<ProgrammingLanguage, Sample> parensSamples() {
         return pack(
                 "public boolean isValid(String s)",
                 "        return false;",
@@ -355,7 +357,7 @@ public final class QuestionCodeCatalog {
         );
     }
 
-    private static Map<String, Sample> windowSamples() {
+    private static Map<ProgrammingLanguage, Sample> windowSamples() {
         return pack(
                 "public int lengthOfLongestSubstring(String s)",
                 "        return 0;",
@@ -498,7 +500,7 @@ public final class QuestionCodeCatalog {
         );
     }
 
-    private static Map<String, Sample> intervalSamples() {
+    private static Map<ProgrammingLanguage, Sample> intervalSamples() {
         return pack(
                 "public int[][] merge(int[][] intervals)",
                 "        return new int[0][0];",
@@ -652,7 +654,7 @@ public final class QuestionCodeCatalog {
         );
     }
 
-    private static Map<String, Sample> rainSamples() {
+    private static Map<ProgrammingLanguage, Sample> rainSamples() {
         return pack(
                 "public int trap(int[] height)",
                 "        return 0;",

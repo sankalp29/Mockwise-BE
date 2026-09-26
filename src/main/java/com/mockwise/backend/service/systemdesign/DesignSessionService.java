@@ -1,8 +1,14 @@
 package com.mockwise.backend.service.systemdesign;
 
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.mockwise.backend.config.SupabaseUser;
-import com.mockwise.backend.service.dashboard.PracticeLedger;
-import com.mockwise.backend.service.session.ActiveSessionGuard;
 import com.mockwise.backend.exception.BadRequestException;
 import com.mockwise.backend.exception.ConflictException;
 import com.mockwise.backend.exception.ForbiddenException;
@@ -14,16 +20,11 @@ import com.mockwise.backend.repository.systemdesign.DesignPrompt;
 import com.mockwise.backend.repository.systemdesign.DesignPromptRepository;
 import com.mockwise.backend.repository.systemdesign.DesignSession;
 import com.mockwise.backend.repository.systemdesign.DesignSessionRepository;
-import com.mockwise.backend.repository.systemdesign.Level;
+import com.mockwise.backend.repository.question.Difficulty;
 import com.mockwise.backend.repository.systemdesign.SessionStatus;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import com.mockwise.backend.service.session.ActiveSessionGuard;
 
-import java.time.Instant;
-import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -33,11 +34,11 @@ public class DesignSessionService {
     private final DesignSessionRepository sessionRepository;
     private final DesignBoardRepository boardRepository;
     private final DesignReviewer reviewer;
-    private final PracticeLedger practiceLedger;
+    private final DesignSubmitStore submitStore;
     private final ActiveSessionGuard activeSessionGuard;
 
     @Transactional
-    public DesignSession start(SupabaseUser user, Level level, int minutes) {
+    public DesignSession start(SupabaseUser user, Difficulty level, int minutes) {
         if (level == null) {
             throw new BadRequestException("Difficulty is required.");
         }
@@ -83,27 +84,14 @@ public class DesignSessionService {
         return session;
     }
 
-    @Transactional
     public DesignSession submit(UUID sessionKey, String userId, String scene, String caption) {
         DesignSession session = requireOwned(sessionKey, userId);
         if (session.getStatus() != SessionStatus.IN_PROGRESS) {
             throw new ConflictException("This design session is already finished.");
         }
-        DesignReviewer.Review review = reviewer.review(scene == null ? "" : scene);
-        DesignBoard board = new DesignBoard();
-        board.setSession(session);
-        board.setScene(scene == null ? "" : scene);
-        board.setCaption(caption);
-        board.setReview(review.body());
-        board.setSubmittedAt(Instant.now());
-        boardRepository.save(board);
-
-        session.setStatus(SessionStatus.COMPLETED);
-        session.setEndedAt(board.getSubmittedAt());
-        session.setOverallRating((double) review.rating());
-        DesignSession saved = sessionRepository.save(session);
-        practiceLedger.recordDesign(saved);
-        return saved;
+        String drawing = scene == null ? "" : scene;
+        DesignReviewer.Review review = reviewer.review(session.getPrompt(), drawing, caption);
+        return submitStore.finish(sessionKey, userId, drawing, caption, review);
     }
 
     @Transactional(readOnly = true)

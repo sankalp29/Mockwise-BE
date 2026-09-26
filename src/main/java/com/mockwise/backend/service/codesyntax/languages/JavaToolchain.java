@@ -1,5 +1,6 @@
 package com.mockwise.backend.service.codesyntax.languages;
 
+import com.mockwise.backend.repository.question.ProgrammingLanguage;
 import com.mockwise.backend.service.codesyntax.LanguageToolchain;
 import com.mockwise.backend.service.codesyntax.model.SyntaxCheckResult;
 import org.springframework.stereotype.Component;
@@ -17,7 +18,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -30,18 +30,8 @@ public class JavaToolchain implements LanguageToolchain {
             Pattern.compile("\\bclass\\s+([A-Za-z_][A-Za-z0-9_]*)");
 
     @Override
-    public String languageId() {
-        return "java";
-    }
-
-    @Override
-    public Set<String> aliases() {
-        return Set.of();
-    }
-
-    @Override
-    public String displayName() {
-        return "Java";
+    public ProgrammingLanguage language() {
+        return ProgrammingLanguage.JAVA;
     }
 
     @Override

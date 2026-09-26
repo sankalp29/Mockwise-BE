@@ -1,5 +1,7 @@
 package com.mockwise.backend.service.interview;
 
+import com.mockwise.backend.repository.question.ProgrammingLanguage;
+
 import java.util.UUID;
 
 /**
@@ -9,7 +11,7 @@ import java.util.UUID;
 public record SubmittedSolution(
         UUID questionId,
         String code,
-        String language,
+        ProgrammingLanguage language,
         String timeComplexity,
         String spaceComplexity
 ) {

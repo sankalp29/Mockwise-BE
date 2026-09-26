@@ -6,7 +6,7 @@ import com.mockwise.backend.repository.systemdesign.DesignPrompt;
 import com.mockwise.backend.repository.systemdesign.DesignPromptRepository;
 import com.mockwise.backend.repository.systemdesign.DesignSession;
 import com.mockwise.backend.repository.systemdesign.DesignSessionRepository;
-import com.mockwise.backend.repository.systemdesign.Level;
+import com.mockwise.backend.repository.question.Difficulty;
 import com.mockwise.backend.repository.systemdesign.SessionStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.ApplicationArguments;
@@ -57,7 +57,7 @@ public class LocalDesignSeeder implements ApplicationRunner {
         DesignSession session = new DesignSession();
         session.setUserId("bypass-test-user");
         session.setUserEmail("test@mockwise.local");
-        session.setLevel(Level.EASY);
+        session.setLevel(Difficulty.EASY);
         session.setTimeMinutes(45);
         session.setPrompt(prompt);
         session.setStartedAt(Instant.now().minusSeconds(2400));

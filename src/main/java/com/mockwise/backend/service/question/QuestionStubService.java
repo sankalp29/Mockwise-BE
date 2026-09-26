@@ -1,5 +1,6 @@
 package com.mockwise.backend.service.question;
 
+import com.mockwise.backend.repository.question.ProgrammingLanguage;
 import com.mockwise.backend.repository.question.QuestionCodeStub;
 import com.mockwise.backend.repository.question.QuestionCodeStubRepository;
 import lombok.RequiredArgsConstructor;
@@ -14,9 +15,9 @@ public class QuestionStubService {
 
     private final QuestionCodeStubRepository questionCodeStubRepository;
 
-    public Optional<String> stubFor(UUID questionId, String language) {
+    public Optional<String> stubFor(UUID questionId, ProgrammingLanguage language) {
         return questionCodeStubRepository
-                .findFirstByQuestion_IdAndLanguageIgnoreCase(questionId, language)
+                .findFirstByQuestion_IdAndLanguage(questionId, language)
                 .map(QuestionCodeStub::getStub);
     }
 }

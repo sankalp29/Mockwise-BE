@@ -1,5 +1,6 @@
 package com.mockwise.backend.controller.interview;
 
+import com.mockwise.backend.repository.question.Difficulty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mockwise.backend.service.interview.FeedbackGenerationWorker;
 import com.mockwise.backend.repository.interview.Interview;
@@ -70,13 +71,13 @@ class InterviewOwnershipMvcTest {
         question = new Question();
         question.setTitle("MVC Q");
         question.setDescription("desc");
-        question.setDifficulty(Question.Difficulty.EASY);
+        question.setDifficulty(Difficulty.EASY);
         question = questionRepository.saveAndFlush(question);
 
         ownedInterview = new Interview();
         ownedInterview.setUserId(OWNER);
         ownedInterview.setUserEmail("owner@test.com");
-        ownedInterview.setDifficulty(Question.Difficulty.EASY);
+        ownedInterview.setDifficulty(Difficulty.EASY);
         ownedInterview.setNumQuestions(1);
         ownedInterview.setTimeMinutes(45);
         ownedInterview.setStartedAt(Instant.now().minusSeconds(120));
@@ -224,7 +225,7 @@ class InterviewOwnershipMvcTest {
         s.setInterview(ownedInterview);
         s.setQuestion(question);
         s.setCode("code");
-        s.setLanguage("java");
+        s.setLanguage(com.mockwise.backend.repository.question.ProgrammingLanguage.JAVA);
         s.setSubmittedAt(Instant.now());
         s.setClaudeFeedback(feedback);
         if (feedback != null) {

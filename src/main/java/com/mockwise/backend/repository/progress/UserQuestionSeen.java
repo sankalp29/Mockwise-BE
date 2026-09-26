@@ -1,5 +1,6 @@
 package com.mockwise.backend.repository.progress;
 
+import com.mockwise.backend.repository.question.Difficulty;
 import com.mockwise.backend.repository.question.Question;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -30,13 +31,13 @@ public class UserQuestionSeen {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "difficulty", nullable = false)
-    private Question.Difficulty difficulty;
+    private Difficulty difficulty;
 
     @CreationTimestamp
     @Column(name = "seen_at", nullable = false, updatable = false)
     private LocalDateTime seenAt;
 
-    public UserQuestionSeen(String userId, UUID questionId, Question.Difficulty difficulty) {
+    public UserQuestionSeen(String userId, UUID questionId, Difficulty difficulty) {
         this.userId = userId;
         this.questionId = questionId;
         this.difficulty = difficulty;

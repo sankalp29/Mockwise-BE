@@ -1,5 +1,6 @@
 package com.mockwise.backend.service.question;
 
+import com.mockwise.backend.repository.question.Difficulty;
 import com.mockwise.backend.repository.progress.UserQuestionSeenRepository;
 import com.mockwise.backend.repository.question.Question;
 import com.mockwise.backend.repository.question.QuestionRepository;
@@ -19,7 +20,7 @@ public class QuestionSelectionService {
     private final QuestionRepository questionRepository;
     private final UserQuestionSeenRepository userQuestionSeenRepository;
 
-    public List<Question> getRandomQuestionsForUser(String userId, Question.Difficulty difficulty, int count) {
+    public List<Question> getRandomQuestionsForUser(String userId, Difficulty difficulty, int count) {
         log.info("Requesting {} random questions with difficulty: {} for user: {}", count, difficulty, userId);
         if (userId != null) {
             return getRandomQuestionsExcludingSeen(userId, difficulty, count);
@@ -27,7 +28,7 @@ public class QuestionSelectionService {
         return getRandomQuestionsOriginal(difficulty, count);
     }
 
-    private List<Question> getRandomQuestionsExcludingSeen(String userId, Question.Difficulty difficulty, int count) {
+    private List<Question> getRandomQuestionsExcludingSeen(String userId, Difficulty difficulty, int count) {
         List<UUID> seenQuestionIds = userQuestionSeenRepository.findSeenQuestionIdsByUserAndDifficulty(userId, difficulty);
         log.info("User {} has seen {} questions of difficulty {}", userId, seenQuestionIds.size(), difficulty);
 
@@ -46,14 +47,14 @@ public class QuestionSelectionService {
         return questions;
     }
 
-    private List<Question> getRandomQuestionsOriginal(Question.Difficulty difficulty, int count) {
+    private List<Question> getRandomQuestionsOriginal(Difficulty difficulty, int count) {
         log.info("Total questions in database: {}", questionRepository.count());
         List<Question> questions = selectQuestions(difficulty, List.of(), count);
         log.info("Found {} questions", questions.size());
         return questions;
     }
 
-    private List<Question> selectQuestions(Question.Difficulty difficulty, List<UUID> excluded, int count) {
+    private List<Question> selectQuestions(Difficulty difficulty, List<UUID> excluded, int count) {
         try {
             if (excluded.isEmpty()) {
                 return questionRepository.findRandomQuestionsByDifficulty(difficulty.name(), count);

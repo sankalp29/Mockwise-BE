@@ -1,5 +1,6 @@
 package com.mockwise.backend.controller.interview.dto;
 
+import com.mockwise.backend.repository.question.ProgrammingLanguage;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -12,11 +13,11 @@ import java.util.UUID;
 public class SubmissionRequest {
     private UUID questionId;
     private String code;
-    private String language;
+    private ProgrammingLanguage language;
     private String timeComplexity;
     private String spaceComplexity;
 
-    public SubmissionRequest(UUID questionId, String code, String language) {
+    public SubmissionRequest(UUID questionId, String code, ProgrammingLanguage language) {
         this.questionId = questionId;
         this.code = code;
         this.language = language;

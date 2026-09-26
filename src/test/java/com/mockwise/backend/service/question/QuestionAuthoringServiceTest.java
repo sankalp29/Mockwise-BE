@@ -1,7 +1,9 @@
 package com.mockwise.backend.service.question;
 
+import com.mockwise.backend.repository.question.Difficulty;
 import com.mockwise.backend.exception.BadRequestException;
 import com.mockwise.backend.repository.question.OptimalSolutionRepository;
+import com.mockwise.backend.repository.question.ProgrammingLanguage;
 import com.mockwise.backend.repository.question.Question;
 import com.mockwise.backend.repository.question.QuestionCodeStubRepository;
 import com.mockwise.backend.repository.question.QuestionRepository;
@@ -16,7 +18,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -46,9 +47,8 @@ class QuestionAuthoringServiceTest {
                 optimalSolutionRepository,
                 languageToolchainRegistry,
                 syntaxCheckFacade);
-        when(javaToolchain.languageId()).thenReturn("java");
+        when(javaToolchain.language()).thenReturn(ProgrammingLanguage.JAVA);
         when(languageToolchainRegistry.all()).thenReturn(List.of(javaToolchain));
-        when(languageToolchainRegistry.find("java")).thenReturn(Optional.of(javaToolchain));
     }
 
     @Test
@@ -62,9 +62,9 @@ class QuestionAuthoringServiceTest {
                 "## Add two numbers",
                 "`1 + 1 = 2`",
                 "- positive integers",
-                "EASY",
-                List.of(new NewQuestion.LanguageCode("java", "class Solution {}")),
-                List.of(new NewQuestion.LanguageCode("java", "class Solution { int x = ; }")));
+                Difficulty.EASY,
+                List.of(new NewQuestion.LanguageCode(ProgrammingLanguage.JAVA, "class Solution {}")),
+                List.of(new NewQuestion.LanguageCode(ProgrammingLanguage.JAVA, "class Solution { int x = ; }")));
 
         BadRequestException failure = assertThrows(BadRequestException.class, () -> service.create(request));
         assertEquals(true, failure.getClientMessage().contains("optimal code failed syntax check"));
@@ -78,9 +78,9 @@ class QuestionAuthoringServiceTest {
                 "## Add",
                 "example",
                 "constraints",
-                "EASY",
+                Difficulty.EASY,
                 List.of(),
-                List.of(new NewQuestion.LanguageCode("java", "class Solution {}")));
+                List.of(new NewQuestion.LanguageCode(ProgrammingLanguage.JAVA, "class Solution {}")));
 
         BadRequestException failure = assertThrows(BadRequestException.class, () -> service.create(request));
         assertEquals(true, failure.getClientMessage().contains("Missing code stub for java"));
@@ -101,13 +101,13 @@ class QuestionAuthoringServiceTest {
                 "## Add two numbers",
                 "`1 + 1 = 2`",
                 "- positive integers",
-                "EASY",
-                List.of(new NewQuestion.LanguageCode("java", "class Solution {}")),
-                List.of(new NewQuestion.LanguageCode("java", "class Solution {}")));
+                Difficulty.EASY,
+                List.of(new NewQuestion.LanguageCode(ProgrammingLanguage.JAVA, "class Solution {}")),
+                List.of(new NewQuestion.LanguageCode(ProgrammingLanguage.JAVA, "class Solution {}")));
 
         Question saved = service.create(request);
         assertEquals("Add", saved.getTitle());
-        assertEquals(Question.Difficulty.EASY, saved.getDifficulty());
+        assertEquals(Difficulty.EASY, saved.getDifficulty());
         verify(questionCodeStubRepository).save(any());
         verify(optimalSolutionRepository).save(any());
     }

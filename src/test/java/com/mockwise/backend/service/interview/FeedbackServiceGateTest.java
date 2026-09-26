@@ -1,5 +1,6 @@
 package com.mockwise.backend.service.interview;
 
+import com.mockwise.backend.repository.question.Difficulty;
 import com.mockwise.backend.exception.BadRequestException;
 import com.mockwise.backend.exception.ForbiddenException;
 import com.mockwise.backend.repository.interview.Interview;
@@ -44,7 +45,7 @@ class FeedbackServiceGateTest {
         interview.setId(interviewId);
         interview.setUserId(OWNER);
         interview.setUserEmail("owner@test.com");
-        interview.setDifficulty(Question.Difficulty.EASY);
+        interview.setDifficulty(Difficulty.EASY);
         interview.setNumQuestions(1);
         interview.setTimeMinutes(30);
         interview.setStartedAt(Instant.now().minus(20, ChronoUnit.MINUTES));
@@ -125,7 +126,7 @@ class FeedbackServiceGateTest {
         s.setId(UUID.randomUUID());
         s.setInterview(interview);
         s.setCode("code");
-        s.setLanguage("java");
+        s.setLanguage(com.mockwise.backend.repository.question.ProgrammingLanguage.JAVA);
         s.setSubmittedAt(Instant.now());
         s.setClaudeFeedback(feedback);
         if (feedback != null) {

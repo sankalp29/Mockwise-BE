@@ -1,5 +1,6 @@
 package com.mockwise.backend.service.codesyntax.languages;
 
+import com.mockwise.backend.repository.question.ProgrammingLanguage;
 import com.mockwise.backend.service.codesyntax.LanguageToolchain;
 import com.mockwise.backend.service.codesyntax.model.SyntaxCheckResult;
 import com.mockwise.backend.service.codesyntax.support.ProcessResult;
@@ -13,7 +14,6 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 @Component
@@ -27,24 +27,14 @@ public class PythonToolchain implements LanguageToolchain {
     }
 
     @Override
-    public String languageId() {
-        return "python";
-    }
-
-
-    @Override
-    public String displayName() {
-        return "Python";
+    public ProgrammingLanguage language() {
+        return ProgrammingLanguage.PYTHON;
     }
 
     @Override
     public boolean isToolchainAvailable() {
         return CommandProbe.exists(processRunner, "python3", "--version")
                 || CommandProbe.exists(processRunner, "python", "--version");
-    }
-    @Override
-    public Set<String> aliases() {
-        return Set.of("py", "python3");
     }
 
     @Override

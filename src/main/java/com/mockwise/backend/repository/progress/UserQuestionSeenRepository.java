@@ -1,5 +1,6 @@
 package com.mockwise.backend.repository.progress;
 
+import com.mockwise.backend.repository.question.Difficulty;
 import com.mockwise.backend.repository.question.Question;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -15,19 +16,19 @@ public interface UserQuestionSeenRepository extends JpaRepository<UserQuestionSe
 
     @Query("SELECT uqs.questionId FROM UserQuestionSeen uqs WHERE uqs.userId = :userId AND uqs.difficulty = :difficulty")
     List<UUID> findSeenQuestionIdsByUserAndDifficulty(@Param("userId") String userId,
-                                                      @Param("difficulty") Question.Difficulty difficulty);
+                                                      @Param("difficulty") Difficulty difficulty);
 
     @Query("SELECT COUNT(DISTINCT uqs.questionId) FROM UserQuestionSeen uqs WHERE uqs.userId = :userId AND uqs.difficulty = :difficulty")
     long countSeenQuestionsByUserAndDifficulty(@Param("userId") String userId,
-                                               @Param("difficulty") Question.Difficulty difficulty);
+                                               @Param("difficulty") Difficulty difficulty);
 
     @Query("SELECT COUNT(q) FROM Question q WHERE q.difficulty = :difficulty")
-    long countTotalQuestionsByDifficulty(@Param("difficulty") Question.Difficulty difficulty);
+    long countTotalQuestionsByDifficulty(@Param("difficulty") Difficulty difficulty);
 
     @Modifying
     @Query("DELETE FROM UserQuestionSeen uqs WHERE uqs.userId = :userId AND uqs.difficulty = :difficulty")
     void deleteByUserIdAndDifficulty(@Param("userId") String userId,
-                                     @Param("difficulty") Question.Difficulty difficulty);
+                                     @Param("difficulty") Difficulty difficulty);
 
     boolean existsByUserIdAndQuestionId(String userId, UUID questionId);
 

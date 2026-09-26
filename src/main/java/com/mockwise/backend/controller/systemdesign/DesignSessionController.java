@@ -4,6 +4,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,7 +23,7 @@ import com.mockwise.backend.exception.BadRequestException;
 import com.mockwise.backend.repository.systemdesign.DesignBoard;
 import com.mockwise.backend.repository.systemdesign.DesignPrompt;
 import com.mockwise.backend.repository.systemdesign.DesignSession;
-import com.mockwise.backend.repository.systemdesign.Level;
+import com.mockwise.backend.service.systemdesign.DesignScene;
 import com.mockwise.backend.service.systemdesign.DesignSessionService;
 
 import lombok.RequiredArgsConstructor;
@@ -32,6 +34,7 @@ import lombok.RequiredArgsConstructor;
 public class DesignSessionController {
 
     private final DesignSessionService designSessionService;
+    private final ObjectMapper objectMapper;
 
     @PostMapping
     public ResponseEntity<Map<String, Object>> start(@RequestBody StartDesignRequest request,
@@ -40,9 +43,12 @@ public class DesignSessionController {
             throw new BadRequestException("Difficulty and time are required.");
         }
         SupabaseUser user = AuthSupport.requireUser(authentication);
+        if (request.getDifficulty() == null) {
+            throw new BadRequestException("Difficulty is required.");
+        }
         DesignSession session = designSessionService.start(
                 user,
-                parseLevel(request.getDifficulty()),
+                request.getDifficulty(),
                 request.getTimeMinutes() == null ? 0 : request.getTimeMinutes());
         return ResponseEntity.ok(openView(session, remaining(session)));
     }
@@ -60,9 +66,11 @@ public class DesignSessionController {
                                                       @RequestBody SubmitDesignRequest request,
                                                       Authentication authentication) {
         SupabaseUser user = AuthSupport.requireUser(authentication);
-        String scene = request == null ? "" : request.getScene();
-        String caption = request == null ? null : request.getCaption();
-        DesignSession session = designSessionService.submit(sessionKey, user.getId(), scene, caption);
+        if (request == null) {
+            throw new BadRequestException("Scene is required.");
+        }
+        DesignScene scene = DesignScene.require(request.getScene(), objectMapper);
+        DesignSession session = designSessionService.submit(sessionKey, user.getId(), scene.json(), request.getCaption());
         return ResponseEntity.ok(Map.of(
                 "message", "Design session submitted",
                 "sessionKey", session.getId().toString()
@@ -78,7 +86,7 @@ public class DesignSessionController {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("session", sessionView(session));
         body.put("prompt", promptView(session.getPrompt()));
-        body.put("scene", board.getScene());
+        body.put("scene", sceneView(board.getScene()));
         body.put("caption", board.getCaption() == null ? "" : board.getCaption());
         body.put("review", board.getReview());
         return ResponseEntity.ok(body);
@@ -114,20 +122,15 @@ public class DesignSessionController {
         return view;
     }
 
+    private Object sceneView(String stored) {
+        JsonNode tree = DesignScene.tree(stored, objectMapper);
+        return tree == null ? stored : tree;
+    }
+
     private static long remaining(DesignSession session) {
         long elapsed = System.currentTimeMillis() - session.getStartedAt().toEpochMilli();
         long budget = session.getTimeMinutes() * 60_000L;
         return Math.max(0, budget - elapsed);
     }
 
-    private static Level parseLevel(String raw) {
-        if (raw == null || raw.isBlank()) {
-            throw new BadRequestException("Difficulty is required.");
-        }
-        try {
-            return Level.valueOf(raw.trim().toUpperCase());
-        } catch (IllegalArgumentException ex) {
-            throw new BadRequestException("Difficulty must be EASY, MEDIUM, or HARD.");
-        }
-    }
 }

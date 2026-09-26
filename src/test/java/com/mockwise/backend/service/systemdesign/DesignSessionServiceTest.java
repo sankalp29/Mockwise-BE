@@ -2,14 +2,13 @@ package com.mockwise.backend.service.systemdesign;
 
 import com.mockwise.backend.config.SupabaseUser;
 import com.mockwise.backend.exception.ConflictException;
-import com.mockwise.backend.service.dashboard.PracticeLedger;
 import com.mockwise.backend.service.session.ActiveSessionGuard;
 import com.mockwise.backend.repository.systemdesign.DesignBoardRepository;
 import com.mockwise.backend.repository.systemdesign.DesignPrompt;
 import com.mockwise.backend.repository.systemdesign.DesignPromptRepository;
 import com.mockwise.backend.repository.systemdesign.DesignSession;
 import com.mockwise.backend.repository.systemdesign.DesignSessionRepository;
-import com.mockwise.backend.repository.systemdesign.Level;
+import com.mockwise.backend.repository.question.Difficulty;
 import com.mockwise.backend.repository.systemdesign.SessionStatus;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,6 +23,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -36,7 +36,7 @@ class DesignSessionServiceTest {
     @Mock private DesignSessionRepository sessionRepository;
     @Mock private DesignBoardRepository boardRepository;
     @Mock private DesignReviewer reviewer;
-    @Mock private PracticeLedger practiceLedger;
+    @Mock private DesignSubmitStore submitStore;
     @Mock private ActiveSessionGuard activeSessionGuard;
     @InjectMocks private DesignSessionService designSessionService;
 
@@ -44,17 +44,17 @@ class DesignSessionServiceTest {
     void startAssignsOnePrompt() {
         DesignPrompt prompt = new DesignPrompt();
         prompt.setTitle("URL Shortener");
-        prompt.setLevel(Level.EASY);
+        prompt.setLevel(Difficulty.EASY);
         when(sessionRepository.findByUserIdAndStatus("guest", SessionStatus.IN_PROGRESS))
                 .thenReturn(List.of());
-        when(promptRepository.findByLevel(Level.EASY)).thenReturn(List.of(prompt));
+        when(promptRepository.findByLevel(Difficulty.EASY)).thenReturn(List.of(prompt));
         when(sessionRepository.save(any())).thenAnswer(invocation -> {
             DesignSession session = invocation.getArgument(0);
             session.setId(UUID.randomUUID());
             return session;
         });
 
-        DesignSession started = designSessionService.start(new SupabaseUser("guest", "test@mockwise.local", true), Level.EASY, 45);
+        DesignSession started = designSessionService.start(new SupabaseUser("guest", "test@mockwise.local", true), Difficulty.EASY, 45);
 
         assertEquals(prompt, started.getPrompt());
         assertEquals(SessionStatus.IN_PROGRESS, started.getStatus());
@@ -70,7 +70,7 @@ class DesignSessionServiceTest {
                 .when(activeSessionGuard).requireClear("guest");
 
         assertThrows(ConflictException.class, () ->
-                designSessionService.start(new SupabaseUser("guest", "test@mockwise.local", true), Level.EASY, 45));
+                designSessionService.start(new SupabaseUser("guest", "test@mockwise.local", true), Difficulty.EASY, 45));
 
         verify(sessionRepository, never()).save(any());
     }
@@ -84,14 +84,20 @@ class DesignSessionServiceTest {
         session.setStatus(SessionStatus.IN_PROGRESS);
         session.setStartedAt(java.time.Instant.now());
         session.setTimeMinutes(45);
+        session.setPrompt(new DesignPrompt());
         when(sessionRepository.findById(sessionKey)).thenReturn(Optional.of(session));
-        when(reviewer.review("[]")).thenReturn(new DesignReviewer.Review("{}", 4));
-        when(sessionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(reviewer.review(any(), eq("[]"), eq("notes"))).thenReturn(new DesignReviewer.Review("{}", 4));
+        when(submitStore.finish(eq(sessionKey), eq("guest"), eq("[]"), eq("notes"), any()))
+                .thenAnswer(invocation -> {
+                    session.setStatus(SessionStatus.COMPLETED);
+                    session.setOverallRating(4.0);
+                    return session;
+                });
 
         DesignSession finished = designSessionService.submit(sessionKey, "guest", "[]", "notes");
 
         assertEquals(SessionStatus.COMPLETED, finished.getStatus());
         assertEquals(4.0, finished.getOverallRating());
-        verify(boardRepository).save(any());
+        verify(submitStore).finish(eq(sessionKey), eq("guest"), eq("[]"), eq("notes"), any());
     }
 }

@@ -62,6 +62,8 @@ app:
 claude:
   api:
     url: ${CLAUDE_API_URL:https://api.anthropic.com}
+  model: ${CLAUDE_MODEL:claude-sonnet-4-20250514}
+  max-tokens: ${CLAUDE_MAX_TOKENS:1500}
 
 judge0:
   api:

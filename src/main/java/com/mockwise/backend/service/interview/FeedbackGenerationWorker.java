@@ -46,15 +46,9 @@ public class FeedbackGenerationWorker {
 
     private void generateFeedbackForSubmission(FeedbackPersistence.SubmissionPromptData data) {
         log.info("Generating feedback for submission: {}", data.submissionId());
-        String prompt = claudeService.buildCodeFeedbackPrompt(
-                data.problemStatement(),
-                data.code(),
-                data.language(),
-                data.userTimeComplexity(),
-                data.userSpaceComplexity());
         log.info("Calling Claude API for submission: {}", data.submissionId());
 
-        String feedback = claudeService.callClaude(prompt);
+        String feedback = claudeService.complete(CodingEvaluation.from(data));
         log.info("Received feedback for submission: {}", data.submissionId());
 
         feedbackPersistence.saveFeedback(data.submissionId(), feedback);

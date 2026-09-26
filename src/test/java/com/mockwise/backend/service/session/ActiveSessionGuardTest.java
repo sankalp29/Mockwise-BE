@@ -1,5 +1,6 @@
 package com.mockwise.backend.service.session;
 
+import com.mockwise.backend.repository.question.Difficulty;
 import com.mockwise.backend.exception.ConflictException;
 import com.mockwise.backend.repository.interview.Interview;
 import com.mockwise.backend.repository.interview.InterviewRepository;
@@ -62,7 +63,7 @@ class ActiveSessionGuardTest {
         interview.setStatus(Interview.Status.IN_PROGRESS);
         interview.setStartedAt(startedAt);
         interview.setTimeMinutes(minutes);
-        interview.setDifficulty(Question.Difficulty.EASY);
+        interview.setDifficulty(Difficulty.EASY);
         return interview;
     }
 

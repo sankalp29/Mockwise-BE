@@ -1,5 +1,6 @@
 package com.mockwise.backend.service.progress;
 
+import com.mockwise.backend.repository.question.Difficulty;
 import com.mockwise.backend.repository.progress.UserQuestionSeen;
 import com.mockwise.backend.repository.progress.UserQuestionSeenRepository;
 import com.mockwise.backend.repository.question.Question;
@@ -27,7 +28,7 @@ class UserQuestionSeenServiceTest {
 
     @Test
     void doesNothingWhenThereAreNoQuestions() {
-        userQuestionSeenService.markQuestionsAsSeen("user-1", List.of(), Question.Difficulty.EASY);
+        userQuestionSeenService.markQuestionsAsSeen("user-1", List.of(), Difficulty.EASY);
 
         verify(userQuestionSeenRepository, never()).saveAll(anyList());
     }
@@ -40,13 +41,13 @@ class UserQuestionSeenServiceTest {
                 "user-1", List.of(alreadySeen, fresh))).thenReturn(List.of(alreadySeen));
 
         userQuestionSeenService.markQuestionsAsSeen(
-                "user-1", List.of(alreadySeen, fresh), Question.Difficulty.HARD);
+                "user-1", List.of(alreadySeen, fresh), Difficulty.HARD);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<UserQuestionSeen>> saved = ArgumentCaptor.forClass(List.class);
         verify(userQuestionSeenRepository).saveAll(saved.capture());
         assertEquals(1, saved.getValue().size());
         assertEquals(fresh, saved.getValue().get(0).getQuestionId());
-        assertEquals(Question.Difficulty.HARD, saved.getValue().get(0).getDifficulty());
+        assertEquals(Difficulty.HARD, saved.getValue().get(0).getDifficulty());
     }
 }

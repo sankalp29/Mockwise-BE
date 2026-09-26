@@ -7,7 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import com.mockwise.backend.exception.BadRequestException;
-import com.mockwise.backend.repository.dashboard.Practice;
+import com.mockwise.backend.repository.dashboard.PracticeFilter;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -25,7 +25,7 @@ public class DashboardController {
             @RequestParam(required = false) String practice,
             Authentication authentication) {
         SupabaseUser user = AuthSupport.requireUser(authentication);
-        return ResponseEntity.ok(dashboardService.metricsFor(user.getId(), parsePractice(practice)));
+        return ResponseEntity.ok(dashboardService.metricsFor(user.getId(), parsePractice(practice).practice()));
     }
 
     @GetMapping("/progress")
@@ -33,17 +33,14 @@ public class DashboardController {
             @RequestParam(required = false) String practice,
             Authentication authentication) {
         SupabaseUser user = AuthSupport.requireUser(authentication);
-        return ResponseEntity.ok(dashboardService.historyFor(user.getId(), parsePractice(practice)));
+        return ResponseEntity.ok(dashboardService.historyFor(user.getId(), parsePractice(practice).practice()));
     }
 
-    private static Practice parsePractice(String raw) {
-        if (raw == null || raw.isBlank() || "ALL".equalsIgnoreCase(raw)) {
-            return null;
-        }
+    private static PracticeFilter parsePractice(String raw) {
         try {
-            return Practice.valueOf(raw.trim().toUpperCase().replace('-', '_'));
+            return PracticeFilter.parse(raw);
         } catch (IllegalArgumentException ex) {
-            throw new BadRequestException("Practice must be ALL, CODING, or SYSTEM_DESIGN.");
+            throw new BadRequestException(ex.getMessage());
         }
     }
 }

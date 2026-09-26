@@ -1,5 +1,6 @@
 package com.mockwise.backend.service.interview;
 
+import com.mockwise.backend.repository.question.Difficulty;
 import com.mockwise.backend.service.evaluation.ClaudeService;
 import com.mockwise.backend.repository.interview.Interview;
 import com.mockwise.backend.repository.interview.InterviewQuestionRepository;
@@ -71,9 +72,7 @@ class FeedbackConnectionLeakTest {
     void noConnectionLeakDuringConcurrentFeedbackGeneration() throws Exception {
         String fakeFeedback = "{\"overallRating\": 7, \"overallFeedback\": \"Good\"}";
 
-        when(claudeService.buildCodeFeedbackPrompt(any(), any(), any(), any(), any()))
-                .thenReturn("test prompt");
-        when(claudeService.callClaude(any())).thenAnswer(invocation -> {
+        when(claudeService.complete(any())).thenAnswer(invocation -> {
             Thread.sleep(200);
             return fakeFeedback;
         });
@@ -83,7 +82,7 @@ class FeedbackConnectionLeakTest {
             Question q = new Question();
             q.setTitle("Test Question " + i);
             q.setDescription("Description " + i);
-            q.setDifficulty(Question.Difficulty.EASY);
+            q.setDifficulty(Difficulty.EASY);
             questions.add(questionRepository.saveAndFlush(q));
         }
 
@@ -92,7 +91,7 @@ class FeedbackConnectionLeakTest {
             Interview interview = new Interview();
             interview.setUserId("test-user-" + i);
             interview.setUserEmail("test" + i + "@example.com");
-            interview.setDifficulty(Question.Difficulty.EASY);
+            interview.setDifficulty(Difficulty.EASY);
             interview.setNumQuestions(SUBMISSIONS_PER_INTERVIEW);
             interview.setTimeMinutes(30);
             interview.setStartedAt(Instant.now().minusSeconds(1800));
@@ -106,7 +105,7 @@ class FeedbackConnectionLeakTest {
                 submission.setInterview(interview);
                 submission.setQuestion(question);
                 submission.setCode("public int solution() { return 42; }");
-                submission.setLanguage("java");
+                submission.setLanguage(com.mockwise.backend.repository.question.ProgrammingLanguage.JAVA);
                 submission.setSubmittedAt(Instant.now());
                 userSubmissionRepository.save(submission);
             }

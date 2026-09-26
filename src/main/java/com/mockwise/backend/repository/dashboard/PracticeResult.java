@@ -1,5 +1,6 @@
 package com.mockwise.backend.repository.dashboard;
 
+import com.mockwise.backend.repository.question.Difficulty;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -37,8 +38,9 @@ public class PracticeResult {
     @Column(name = "source_key", nullable = false)
     private UUID sourceKey;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String difficulty;
+    private Difficulty difficulty;
 
     @Column(name = "question_count", nullable = false)
     private int questionCount;

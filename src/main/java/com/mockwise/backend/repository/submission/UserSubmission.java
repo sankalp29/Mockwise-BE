@@ -2,6 +2,7 @@ package com.mockwise.backend.repository.submission;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.mockwise.backend.repository.interview.Interview;
+import com.mockwise.backend.repository.question.ProgrammingLanguage;
 import com.mockwise.backend.repository.question.Question;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -38,7 +39,7 @@ public class UserSubmission {
     private String code;
 
     @Column(nullable = false)
-    private String language = "javascript";
+    private ProgrammingLanguage language = ProgrammingLanguage.JAVASCRIPT;
 
     @Column(name = "submitted_at", nullable = false)
     private Instant submittedAt;

@@ -1,5 +1,6 @@
 package com.mockwise.backend.service.interview;
 
+import com.mockwise.backend.repository.question.Difficulty;
 import com.mockwise.backend.config.SupabaseUser;
 import com.mockwise.backend.exception.BadRequestException;
 import com.mockwise.backend.exception.ConflictException;
@@ -44,7 +45,7 @@ public class InterviewService {
     private final ActiveSessionGuard activeSessionGuard;
 
     @Transactional
-    public Interview startInterview(SupabaseUser user, Question.Difficulty difficulty,
+    public Interview startInterview(SupabaseUser user, Difficulty difficulty,
                                     Integer numQuestions, Integer timeMinutes) {
         activeSessionGuard.requireClear(user.getId());
         log.info("Starting interview for user: {} with difficulty: {}, questions: {}, time: {}",
@@ -148,7 +149,7 @@ public class InterviewService {
         userQuestionSeenService.markQuestionsAsSeen(userId, interview);
     }
 
-    public void markQuestionsAsSeen(String userId, List<UUID> questionIds, Question.Difficulty difficulty) {
+    public void markQuestionsAsSeen(String userId, List<UUID> questionIds, Difficulty difficulty) {
         userQuestionSeenService.markQuestionsAsSeen(userId, questionIds, difficulty);
     }
 

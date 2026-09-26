@@ -41,7 +41,7 @@ com.mockwise.backend
     submission/        (persistence only today; no service yet)
     dashboard/         metrics, progress, aggregate updates
     progress/          questions the user has already seen
-    evaluation/        Claude prompts and the HTTP call
+    evaluation/        Claude transport. Each interview type owns its prompt.
     codesyntax/        language toolchains (strategy + registry + facade)
     auth/              Supabase user lookup
   repository/          JPA entities and Spring Data interfaces, per feature
@@ -104,7 +104,11 @@ Reuse `config`, `exception`, and `service/auth`. Do not add system-design fields
 
 ### Syntax checking
 
-`service/codesyntax` is a strategy. `LanguageToolchain` is the interface. Each language is a `@Component` in `languages/`. `LanguageToolchainRegistry` finds one by id or alias. `SyntaxCheckFacade` runs it in a temp workspace. Add a language by adding a toolchain class. Do not edit a switch statement.
+`service/codesyntax` is a strategy. `LanguageToolchain` is the interface. Each language is a `@Component` in `languages/`. `LanguageToolchainRegistry` finds one by id or alias. `SyntaxCheckFacade` runs it in a temp workspace. Add a language by adding a `ProgrammingLanguage` constant and a toolchain class. Do not edit a switch statement. The constant's id is the database and JSON value.
+
+### Model evaluation
+
+`EvaluationSpec` is the strategy. `CodingEvaluation` and `DesignEvaluation` each own that style's prompt and fallback JSON. `ClaudeService.complete` sends the prompt with the shared model and token limit from `claude.model` and `claude.max-tokens`. Add a style by adding a class. Do not add a prompt method to `ClaudeService`.
 
 ## Rules
 
@@ -120,7 +124,7 @@ Follow these on every change.
 
 ### SOLID
 
-- One class, one reason to change. Interview start/submit stays in `InterviewService`. Feedback gating stays in `FeedbackService`. Claude I/O stays in `ClaudeService`.
+- One class, one reason to change. Interview start/submit stays in `InterviewService`. Feedback gating stays in `FeedbackService`. Claude I/O stays in `ClaudeService`. A new interview style adds an `EvaluationSpec`; it does not add a method to `ClaudeService`. Model name and token limit stay on `ClaudeService`.
 - Open for a new language or a new interview style by adding a class, not by editing a central conditional.
 - Depend on the service or repository you need, not on a class that happens to be nearby.
 - Small interfaces. `LanguageToolchain` is the model: one method the caller needs, not a grab bag.
