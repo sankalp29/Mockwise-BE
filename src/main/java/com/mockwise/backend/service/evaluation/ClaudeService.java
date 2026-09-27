@@ -19,7 +19,7 @@ import org.springframework.stereotype.Service;
 public class ClaudeService {
 
     private static final Logger log = LoggerFactory.getLogger(ClaudeService.class);
-    private static final String DEFAULT_MODEL = "claude-sonnet-4-20250514";
+    private static final String DEFAULT_MODEL = "claude-opus-4-7";
     private static final long DEFAULT_MAX_TOKENS = 1500L;
 
     private final ObjectMapper objectMapper;
@@ -28,7 +28,7 @@ public class ClaudeService {
     @Value("${claude.api.key:}")
     private String claudeApiKey;
 
-    @Value("${claude.model:claude-sonnet-4-20250514}")
+    @Value("${claude.model:claude-opus-4-7}")
     private String model;
 
     @Value("${claude.max-tokens:1500}")
